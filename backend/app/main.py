@@ -3,7 +3,7 @@ import logging
 from dotenv import load_dotenv
 
 # Load .env file before anything else
-load_dotenv()
+load_dotenv(override=True)
 
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
