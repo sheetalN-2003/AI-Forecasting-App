@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, LayoutDashboard, Package, TrendingUp, 
@@ -8,21 +7,19 @@ import {
 } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { id: 'dash', title: 'User Dashboard', path: '/dashboard', icon: LayoutDashboard, keywords: 'main home' },
-  { id: 'analyst', title: 'Analyst Workspace', path: '/analyst-dashboard', icon: TrendingUp, keywords: 'data analytics' },
-  { id: 'admin', title: 'Admin Console', path: '/admin-dashboard', icon: Terminal, keywords: 'system control' },
-  { id: 'inv', title: 'Inventory Analytics', path: '/inventory', icon: Package, keywords: 'stock warehouse' },
-  { id: 'fore', title: 'Sales Forecasting', path: '/forecasting', icon: Brain, keywords: 'ai prediction' },
-  { id: 'ins', title: 'AI Business Insights', path: '/insights', icon: Globe, keywords: 'chat genai' },
-  { id: 'set', title: 'System Settings', path: '/settings', icon: Settings, keywords: 'profile config' },
+  { id: 'dashboard', title: 'User Dashboard', icon: LayoutDashboard, keywords: 'main home admin analyst' },
+  { id: 'inventory', title: 'Inventory Analytics', icon: Package, keywords: 'stock warehouse' },
+  { id: 'forecasting', title: 'Sales Forecasting', icon: Brain, keywords: 'ai prediction' },
+  { id: 'insights', title: 'AI Business Insights', icon: Globe, keywords: 'chat genai' },
+  { id: 'api', title: 'Developer API', icon: Terminal, keywords: 'system control endpoint' },
+  { id: 'settings', title: 'System Settings', icon: Settings, keywords: 'profile config' },
 ];
 
-export const CommandCenter = () => {
+export const CommandCenter = ({ setActiveTab }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState(NAV_ITEMS);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const navigate = useNavigate();
 
   const close = useCallback(() => {
     setIsOpen(false);
@@ -54,8 +51,8 @@ export const CommandCenter = () => {
     setSelectedIndex(0);
   }, [query]);
 
-  const handleSelect = (path) => {
-    navigate(path);
+  const handleSelect = (id) => {
+    if (setActiveTab) setActiveTab(id);
     close();
   };
 
@@ -65,7 +62,7 @@ export const CommandCenter = () => {
     } else if (e.key === 'ArrowUp') {
       setSelectedIndex(prev => (prev - 1 + results.length) % results.length);
     } else if (e.key === 'Enter' && results[selectedIndex]) {
-      handleSelect(results[selectedIndex].path);
+      handleSelect(results[selectedIndex].id);
     }
   };
 
@@ -105,7 +102,7 @@ export const CommandCenter = () => {
                 results.map((item, i) => (
                   <button
                     key={item.id}
-                    onClick={() => handleSelect(item.path)}
+                    onClick={() => handleSelect(item.id)}
                     onMouseEnter={() => setSelectedIndex(i)}
                     className={`w-full flex items-center justify-between p-3 rounded-xl transition-all ${
                       selectedIndex === i ? 'bg-indigo-600/20 border border-indigo-500/30' : 'border border-transparent hover:bg-white/5'
@@ -117,7 +114,7 @@ export const CommandCenter = () => {
                       </div>
                       <div className="text-left">
                         <p className="text-sm font-bold text-white">{item.title}</p>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{item.path}</p>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{item.id}</p>
                       </div>
                     </div>
                     {selectedIndex === i && (

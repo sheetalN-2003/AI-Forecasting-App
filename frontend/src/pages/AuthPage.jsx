@@ -46,7 +46,7 @@ export const AuthPage = () => {
   const otpRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
 
   const [form, setForm] = useState({
-    name: '', username: '', email: '', password: '', confirmPassword: '', 
+    name: '', username: '', email: '', password: '', confirmPassword: '',
     role: 'User', otp: ['', '', '', '', '', '']
   });
 
@@ -72,7 +72,7 @@ export const AuthPage = () => {
     setLoading(true); setError(''); setSuccess('');
     try {
       const { data } = await axios.post(`${API_BASE}/auth/register-init`, {
-        name: form.name, username: form.username, email: form.email, 
+        name: form.name, username: form.username, email: form.email,
         password: form.password, role: form.role
       });
       setSuccess(data.message);
@@ -94,7 +94,7 @@ export const AuthPage = () => {
         email: form.email,
         otp: otpCode,
         registration_data: {
-          name: form.name, username: form.username, email: form.email, 
+          name: form.name, username: form.username, email: form.email,
           password: form.password, role: form.role
         }
       });
@@ -123,7 +123,7 @@ export const AuthPage = () => {
     <div className="min-h-screen bg-[#05070a] text-slate-300 flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans">
       {/* Neural background mesh */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(17,24,39,1)_0%,rgba(5,7,10,1)_100%)]" />
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full opacity-20 pointer-events-none" 
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full opacity-20 pointer-events-none"
         style={{ backgroundImage: 'radial-gradient(#1e293b 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
 
       <div className="w-full max-w-lg relative z-10">
@@ -154,7 +154,7 @@ export const AuthPage = () => {
               <InputField id="login-password" name="password" icon={Lock} label="Access Key" type={showPass ? 'text' : 'password'} placeholder="••••••••" value={form.password} onChange={f('password')}
                 rightIcon={<button type="button" onClick={() => setShowPass(!showPass)} className="text-slate-600">{showPass ? <EyeOff size={16} /> : <Eye size={16} />}</button>}
               />
-              {error && <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-2xl text-red-400 text-[10px] font-bold flex items-center gap-3"><AlertCircle size={16}/>{error}</div>}
+              {error && <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-2xl text-red-400 text-[10px] font-bold flex items-center gap-3"><AlertCircle size={16} />{error}</div>}
               <button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-xl shadow-indigo-600/20 transition-all active:scale-[0.98]">
                 {loading ? <Loader2 size={18} className="animate-spin mx-auto" /> : 'Enter Environment'}
               </button>
@@ -172,12 +172,12 @@ export const AuthPage = () => {
                     <InputField id="reg-password" name="password" icon={Lock} label="Secret Key" type="password" placeholder="••••••••" value={form.password} onChange={f('password')} />
                     <InputField id="reg-confirm" name="confirmPassword" icon={ShieldCheck} label="Confirm Key" type="password" placeholder="••••••••" value={form.confirmPassword} onChange={f('confirmPassword')} />
                   </div>
-                  
+
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">System Authorization</label>
                     <div className="grid grid-cols-3 gap-2">
                       {ROLES.map(r => (
-                        <button type="button" key={r.value} onClick={() => setForm({...form, role: r.value})}
+                        <button type="button" key={r.value} onClick={() => setForm({ ...form, role: r.value })}
                           className={`py-2.5 rounded-xl border-2 text-[10px] font-black transition-all ${form.role === r.value ? `border-${r.color}-500/50 bg-${r.color}-500/10 text-white` : 'border-white/5 bg-white/5 text-slate-500 hover:text-slate-300'}`}>
                           {r.label}
                         </button>
@@ -185,7 +185,7 @@ export const AuthPage = () => {
                     </div>
                   </div>
 
-                  {error && <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-2xl text-red-400 text-[10px] font-bold flex items-center gap-3"><AlertCircle size={16}/>{error}</div>}
+                  {error && <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-2xl text-red-400 text-[10px] font-bold flex items-center gap-3"><AlertCircle size={16} />{error}</div>}
                   <button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] transition-all">
                     {loading ? <Loader2 size={18} className="animate-spin mx-auto" /> : 'Request Verification'}
                   </button>
@@ -208,7 +208,7 @@ export const AuthPage = () => {
                     ))}
                   </div>
 
-                  {error && <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-2xl text-red-400 text-[10px] font-bold flex items-center gap-3"><AlertCircle size={16}/>{error}</div>}
+                  {error && <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-2xl text-red-400 text-[10px] font-bold flex items-center gap-3"><AlertCircle size={16} />{error}</div>}
                   <button onClick={handleVerifyRegistration} disabled={loading || otpCode.length < 6} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-xl shadow-indigo-600/20">
                     {loading ? <Loader2 size={18} className="animate-spin mx-auto" /> : 'Finalize Onboarding'}
                   </button>

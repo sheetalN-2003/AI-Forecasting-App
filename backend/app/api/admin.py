@@ -9,13 +9,14 @@ import time
 def record_audit_log(db: Session, user_id: int, action: str, resource: str, details: str = None, resource_id: str = None):
     """Utility to record administrative actions in the immutable audit log."""
     try:
+        from datetime import datetime
         log = AuditLog(
             user_id=user_id,
             action=action,
             resource=resource,
             resource_id=str(resource_id) if resource_id else None,
             details=details,
-            created_at=time.time() # Will be converted by SQLAlchemy if using DateTime, but let's be safe
+            created_at=datetime.utcnow()
         )
         db.add(log)
         db.commit()
@@ -57,6 +58,9 @@ def get_admin_metrics(db: Session = Depends(get_db)):
         {"id": 2, "type": "Token Rotation", "user": "admin_main", "ip": "10.0.0.8", "time": "15 mins ago", "status": "Success"},
     ]
     
+    # Fetch users list for the users section
+    users_list = db.query(User).all()
+
     return {
         "overview": {
             "total_revenue": total_revenue,
@@ -72,7 +76,7 @@ def get_admin_metrics(db: Session = Depends(get_db)):
             "memory_usage": mem.percent,
             "api_response_time_ms": 42,
             "db_health": "Optimal",
-            "active_users": active_sessions,
+            "active_users": active_sessions_count,
             "server_region": "us-east-1",
             "last_backup": "12 mins ago"
         },
@@ -173,7 +177,7 @@ def update_user_role(user_id: int, body: UserRoleUpdate, db: Session = Depends(g
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    valid_roles = ["Admin", "Analyst", "Manager"]
+    valid_roles = ["Admin", "Analyst", "Manager", "Employee", "User"]
     if body.role not in valid_roles:
         raise HTTPException(status_code=400, detail=f"Role must be one of: {valid_roles}")
     user.role = body.role

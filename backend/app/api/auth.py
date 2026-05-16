@@ -50,7 +50,7 @@ class UserResponse(BaseModel):
 
 class Token(BaseModel):
     access_token: str
-    refresh_token: str
+    refresh_token: Optional[str] = None
     token_type: str
     user: UserResponse
     expires: str = "24h"
@@ -122,34 +122,97 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-def send_verification_email(email: str, token: str):
+PLACEHOLDER_VALUES = {"your-email@gmail.com", "your-app-password", "localhost", ""}
+
+def _check_smtp_config():
+    """Raise HTTP 503 immediately if SMTP is not properly configured."""
+    smtp_host = os.getenv("SMTP_HOST", "")
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_pass = os.getenv("SMTP_PASSWORD", "")
+    mail_from = os.getenv("MAIL_FROM", "")
+
+    missing = []
+    for name, val in [("SMTP_HOST", smtp_host), ("SMTP_USER", smtp_user), ("SMTP_PASSWORD", smtp_pass), ("MAIL_FROM", mail_from)]:
+        if not val or val in PLACEHOLDER_VALUES:
+            missing.append(name)
+
+    if missing:
+        raise HTTPException(
+            status_code=503,
+            detail=f"SMTP misconfiguration: {', '.join(missing)} is missing or contains a placeholder value. "
+                   "Update your .env file with real credentials and restart the server."
+        )
+
+def send_otp_email(email: str, otp: str, expiry_minutes: int = 10):
+    """Send a verification OTP to the given email address."""
+    _check_smtp_config()
+
     smtp_host = os.getenv("SMTP_HOST")
     smtp_port = int(os.getenv("SMTP_PORT", 587))
     smtp_user = os.getenv("SMTP_USER")
     smtp_pass = os.getenv("SMTP_PASSWORD")
     mail_from = os.getenv("MAIL_FROM")
 
-    if not all([smtp_host, smtp_user, smtp_pass, mail_from]):
-        print(f"DEBUG: SMTP not fully configured. Would send verification to {email} with token {token}")
-        return
+    msg = MIMEMultipart("alternative")
+    msg["From"] = mail_from
+    msg["To"] = email
+    msg["Subject"] = "Your RetailPulse AI Verification Code"
+
+    body = (
+        f"Hello,\n\n"
+        f"Your verification code is:\n\n"
+        f"    {otp}\n\n"
+        f"This code expires in {expiry_minutes} minutes.\n\n"
+        f"If you did not request this, please ignore this email.\n\n"
+        f"— RetailPulse AI"
+    )
+    msg.attach(MIMEText(body, "plain"))
 
     try:
-        msg = MIMEMultipart()
-        msg['From'] = mail_from
-        msg['To'] = email
-        msg['Subject'] = "Verify your RetailPulse AI Account"
-
-        body = f"Please verify your account by clicking the link: http://localhost:5173/verify?token={token}\n\nIf you did not request this, please ignore."
-        msg.attach(MIMEText(body, 'plain'))
-
         server = smtplib.SMTP(smtp_host, smtp_port)
         server.starttls()
         server.login(smtp_user, smtp_pass)
         server.send_message(msg)
         server.quit()
-        print(f"Successfully sent verification email to {email}")
+        print(f"OTP email sent to {email}")
     except Exception as e:
-        print(f"Failed to send email to {email}: {e}")
+        raise HTTPException(status_code=503, detail=f"Failed to send verification email: {e}")
+
+
+def send_reset_email(email: str, reset_link: str, expiry_minutes: int = 60):
+    """Send a password reset link to the given email address."""
+    _check_smtp_config()
+
+    smtp_host = os.getenv("SMTP_HOST")
+    smtp_port = int(os.getenv("SMTP_PORT", 587))
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_PASSWORD")
+    mail_from = os.getenv("MAIL_FROM")
+
+    msg = MIMEMultipart("alternative")
+    msg["From"] = mail_from
+    msg["To"] = email
+    msg["Subject"] = "RetailPulse AI — Password Reset Request"
+
+    body = (
+        f"Hello,\n\n"
+        f"We received a request to reset your password. Click the link below to proceed:\n\n"
+        f"    {reset_link}\n\n"
+        f"This link expires in {expiry_minutes} minutes.\n\n"
+        f"If you did not request a password reset, please ignore this email.\n\n"
+        f"— RetailPulse AI"
+    )
+    msg.attach(MIMEText(body, "plain"))
+
+    try:
+        server = smtplib.SMTP(smtp_host, smtp_port)
+        server.starttls()
+        server.login(smtp_user, smtp_pass)
+        server.send_message(msg)
+        server.quit()
+        print(f"Password reset email sent to {email}")
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Failed to send reset email: {e}")
 
 
 import re
@@ -216,6 +279,15 @@ def register_init(req: RegisterInitRequest, db: Session = Depends(get_db)):
     if db.query(User).filter((User.username == req.username) | (User.email == req.email)).first():
         raise HTTPException(status_code=400, detail="Username or email already registered")
     
+    # Validate SMTP config before doing anything else
+    _check_smtp_config()
+
+    # Invalidate any existing unexpired OTPs for this email
+    db.query(OTPVerification).filter(
+        OTPVerification.email == req.email,
+        OTPVerification.verified == False
+    ).delete()
+
     # Generate OTP
     otp_code = str(secrets.randbelow(899999) + 100000)
     expiry = datetime.utcnow() + timedelta(minutes=10)
@@ -225,9 +297,10 @@ def register_init(req: RegisterInitRequest, db: Session = Depends(get_db)):
     db.add(otp_entry)
     db.commit()
     
-    # Send email (Mocked)
-    print(f"📧 REGISTRATION OTP FOR {req.email}: {otp_code}")
-    return {"message": "Verification code sent to your email", "code": otp_code}
+    # Send OTP via real email — raises 503 on failure
+    send_otp_email(req.email, otp_code, expiry_minutes=10)
+
+    return {"message": "Verification code sent to your email"}
 
 @router.post("/verify-registration", response_model=Token)
 def verify_registration(req: VerifyRegistrationRequest, db: Session = Depends(get_db)):
@@ -308,21 +381,33 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == req.email).first()
     if not user:
         return {"message": "If the email exists, a reset link has been sent"}
+    
+    # Validate SMTP config before generating any token
+    _check_smtp_config()
+
     reset_token = secrets.token_urlsafe(32)
-    reset_db[reset_token] = req.email
+    expiry = datetime.utcnow() + timedelta(minutes=60)
+    reset_db[reset_token] = {"email": req.email, "expires_at": expiry}
+
     reset_link = f"http://localhost:5173/reset-password?token={reset_token}"
-    print(f"📧 PASSWORD RESET LINK FOR {req.email}: {reset_link}")
-    # Send real email if SMTP configured
-    send_verification_email(req.email, f"Reset your password: {reset_link}")
-    return {"message": "Reset link sent to your email", "debug_token": reset_token}
+
+    # Send reset link via real email — raises 503 on failure
+    send_reset_email(req.email, reset_link, expiry_minutes=60)
+
+    return {"message": "Reset link sent to your email"}
 
 @router.post("/reset-password")
 def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
     if not is_password_strong(req.new_password):
         raise HTTPException(status_code=400, detail="Password too weak. Use 12+ chars with uppercase, numbers, and symbols.")
-    email = reset_db.get(req.token)
-    if not email:
+    entry = reset_db.get(req.token)
+    if not entry:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    # Check expiry
+    if datetime.utcnow() > entry["expires_at"]:
+        del reset_db[req.token]
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    email = entry["email"]
     user = db.query(User).filter(User.email == email).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -387,7 +472,8 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
 
     access_token = create_access_token({"sub": new_user.username})
-    return {"access_token": access_token, "token_type": "bearer", "user": new_user}
+    refresh_token = create_refresh_token({"sub": new_user.username})
+    return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer", "user": new_user}
 
 from app.models.schemas import User, LoginSession
 
@@ -405,18 +491,29 @@ def verify_2fa_login(req: TwoFARequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == req.username).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    # In production, verify against pyotp. For demo, accept code from verification_db or fixed
-    stored_code = verification_db.get(f"2fa_{req.username}")
-    if stored_code and stored_code == req.code:
-        del verification_db[f"2fa_{req.username}"]
-    elif req.code != "123456":  # Fallback demo code
+
+    stored = verification_db.get(f"2fa_{req.username}")
+    if not stored:
         raise HTTPException(status_code=400, detail="Invalid 2FA code")
+
+    # Check expiry
+    if datetime.utcnow() > stored["expires_at"]:
+        del verification_db[f"2fa_{req.username}"]
+        raise HTTPException(status_code=400, detail="Invalid 2FA code")
+
+    # Validate code — no hardcoded fallback
+    if stored["code"] != req.code:
+        raise HTTPException(status_code=400, detail="Invalid 2FA code")
+
+    # Consume the OTP (replay attack prevention)
+    del verification_db[f"2fa_{req.username}"]
+
     token = create_access_token({"sub": user.username})
     return {"access_token": token, "token_type": "bearer", "user": user}
 
 @router.get("/sessions")
 def get_login_sessions(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return db.query(LoginSession).filter(LoginSession.user_id == current_user.id).order_by(LoginSession.created_at.desc()).limit(10).all()
+    return db.query(LoginSession).filter(LoginSession.user_id == current_user.id).order_by(LoginSession.login_time.desc()).limit(10).all()
 
 @router.post("/login", response_model=Token)
 def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
@@ -448,8 +545,17 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db
     
     # Check for 2FA
     if user.two_factor_enabled:
-        # Simulate sending a code
-        print(f"📧 2FA CODE SENT TO {user.email}: 123456 (Simulated)")
+        # Validate SMTP before generating OTP
+        _check_smtp_config()
+
+        # Generate a real OTP and store it with expiry
+        otp_code = str(secrets.randbelow(899999) + 100000)
+        otp_expiry = datetime.utcnow() + timedelta(minutes=10)
+        verification_db[f"2fa_{user.username}"] = {"code": otp_code, "expires_at": otp_expiry}
+
+        # Send OTP via real email — raises 503 on failure
+        send_otp_email(user.email, otp_code, expiry_minutes=10)
+
         return {
             "access_token": "PENDING_2FA", 
             "token_type": "bearer", 

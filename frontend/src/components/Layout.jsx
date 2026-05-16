@@ -112,7 +112,7 @@ export const Layout = ({ children, activeTab, setActiveTab }) => {
 
   return (
     <div className="flex h-screen bg-slate-950 overflow-hidden">
-      <CommandCenter />
+      <CommandCenter setActiveTab={setActiveTab} />
 
       <AnimatePresence>
         {globalAlert && (

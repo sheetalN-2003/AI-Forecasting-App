@@ -437,7 +437,24 @@ export const UserDashboard = () => {
             CSV Export
           </button>
           <button 
-            onClick={() => alert("Generating high-fidelity PDF report... Please check your downloads folder shortly.")}
+            onClick={async () => {
+              try {
+                const token = localStorage.getItem('retailpulse_token');
+                const res = await fetch('http://localhost:8000/analytics/export-pdf', {
+                  headers: { Authorization: `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Export failed');
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `RetailPulse_Report_${new Date().toISOString().slice(0,10)}.pdf`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+              } catch (err) {
+                alert('PDF export failed. Please try again.');
+              }
+            }}
             className="flex-1 md:flex-none px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20 transition-all"
           >
             Download PDF

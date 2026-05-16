@@ -11,6 +11,7 @@ router = APIRouter()
 @router.get("/export-data", tags=["Compliance"])
 @require_permission("compliance.export")
 async def export_user_data(
+    request: Request,
     current_user: TokenData = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -38,7 +39,7 @@ async def export_user_data(
         ]
     }
     
-    log_audit("data_export", "user_data", user_id=user.id, details={"format": "json"})
+    log_audit("data_export", "user_data", user_id=user.id, details={"format": "json"}, request=request)
     return data
 
 @router.delete("/delete-account", tags=["Compliance"])
