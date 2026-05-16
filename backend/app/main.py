@@ -1,5 +1,10 @@
 import asyncio
 import logging
+from dotenv import load_dotenv
+
+# Load .env file before anything else
+load_dotenv()
+
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
