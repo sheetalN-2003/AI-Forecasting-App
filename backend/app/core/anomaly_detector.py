@@ -9,19 +9,25 @@ def detect_sales_anomalies(db: Session):
     Scans recent sales data and returns anomalies based on 
     Standard Deviation (Z-Score > 2.5).
     """
-    # 1. Get average sales per category for the last 30 days
     thirty_days_ago = datetime.now() - timedelta(days=30)
     
-    stats = db.query(
-        SaleRecord.category,
-        func.avg(SaleRecord.sales).label('avg_sales'),
-        func.stddev(SaleRecord.sales).label('std_dev')
-    ).filter(SaleRecord.order_date >= thirty_days_ago)\
-     .group_by(SaleRecord.category).all()
-    
+    # SQLite does not support func.stddev(), so we calculate it in Python
+    recent_sales = db.query(SaleRecord.category, SaleRecord.sales)\
+        .filter(SaleRecord.order_date >= thirty_days_ago).all()
+        
+    category_stats = {}
+    for category, sales in recent_sales:
+        if category not in category_stats:
+            category_stats[category] = []
+        category_stats[category].append(sales)
+        
     anomalies = []
     
-    for category, avg, std in stats:
+    for category, sales_list in category_stats.items():
+        if len(sales_list) < 2: continue
+        avg = np.mean(sales_list)
+        std = np.std(sales_list)
+        
         if not std or std == 0: continue
         
         # 2. Check the very latest sales for this category
