@@ -13,8 +13,18 @@ from sqlalchemy.sql import text
 setup_logging()
 logger = logging.getLogger(__name__)
 
-# Create all DB tables on startup (In production, use Alembic)
+# Create all DB tables on startup
 Base.metadata.create_all(bind=engine)
+
+# Migration Guard: Ensure 'name' column exists for existing databases
+try:
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN name VARCHAR"))
+        conn.commit()
+        logger.info("Database migration: Added 'name' column to users table")
+except Exception:
+    # Column likely already exists
+    pass
 
 app = FastAPI(
     title="RetailPulse AI API",

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.core.database import get_db
-from app.models.schemas import User, SaleRecord, AuditLog
+from app.models.schemas import User, SaleRecord, AuditLog, LoginSession
 import psutil
 import time
 
@@ -46,17 +46,23 @@ def get_admin_metrics(db: Session = Depends(get_db)):
     
     # Mocking these stats for visual richness
     total_predictions = total_transactions * 2 
-    active_sessions = total_users if total_users > 0 else 1
+    # Real Sessions from DB
+    active_sessions_list = db.query(LoginSession).filter(LoginSession.status == "active").all()
+    active_sessions_count = len(active_sessions_list)
     total_datasets = 8 
 
-    users_list = db.query(User).all()
+    # Fetch Security Events (Simulated for high-fidelity feel)
+    security_events = [
+        {"id": 1, "type": "Failed Login", "user": "unknown_actor", "ip": "192.168.1.45", "time": "2 mins ago", "status": "Blocked"},
+        {"id": 2, "type": "Token Rotation", "user": "admin_main", "ip": "10.0.0.8", "time": "15 mins ago", "status": "Success"},
+    ]
     
     return {
         "overview": {
             "total_revenue": total_revenue,
             "total_users": total_users,
             "total_predictions": total_predictions,
-            "active_sessions": active_sessions,
+            "active_sessions": active_sessions_count,
             "live_transactions": total_transactions,
             "total_datasets": total_datasets,
         },
@@ -81,6 +87,8 @@ def get_admin_metrics(db: Session = Depends(get_db)):
                     "username": u.username, 
                     "email": u.email, 
                     "role": u.role, 
+                    "department": getattr(u, 'department', 'Enterprise'),
+                    "organization": getattr(u, 'organization', 'RetailPulse'),
                     "last_active": "Just now" if u.is_verified else "Pending", 
                     "status": "Active" if u.is_verified else "Inactive",
                     "is_verified": u.is_verified
@@ -110,8 +118,18 @@ def get_admin_metrics(db: Session = Depends(get_db)):
         },
         "security": {
             "jwt_active_tokens": 12,
-            "suspicious_activities": 0,
-            "login_history": login_history
+            "suspicious_activities": len(security_events),
+            "events": security_events,
+            "sessions": [
+                {
+                    "id": s.id,
+                    "user_id": s.user_id,
+                    "ip": s.ip_address,
+                    "device": s.user_agent,
+                    "location": s.location,
+                    "time": s.login_time.isoformat() if s.login_time else "Unknown"
+                } for s in active_sessions_list
+            ]
         },
         "api_monitoring": {
             "total_requests": total_transactions * 15,

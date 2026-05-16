@@ -76,57 +76,81 @@ const AnalystCard = ({ title, value, sub, icon: Icon, trend, colorClass }) => (
 // --- Section Components ---
 
 const BusinessOverview = ({ data }) => {
-  const { growth, metrics } = data;
+  const { growth } = data;
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <AnalystCard title="Current Revenue" value={`$${(growth.current_revenue / 1000).toFixed(1)}k`} trend={12.4} icon={DollarSign} colorClass="text-emerald-400" />
         <AnalystCard title="Predicted Rev." value={`$${(growth.predicted_revenue / 1000).toFixed(1)}k`} trend={8.2} icon={TrendingUp} colorClass="text-indigo-400" />
         <AnalystCard title="Monthly Growth" value={`${growth.monthly_growth}%`} trend={2.1} icon={Activity} colorClass="text-fuchsia-400" />
-        <AnalystCard title="Inventory" value={growth.inventory_health} icon={Package} colorClass="text-amber-400" />
-        <AnalystCard title="Top Product" value={growth.top_product} icon={ShoppingBag} colorClass="text-blue-400" />
-        <AnalystCard title="AI Accuracy" value={`${growth.forecast_accuracy}%`} icon={Brain} colorClass="text-rose-400" />
+        <AnalystCard title="Inventory Mesh" value={growth.inventory_health} icon={Package} colorClass="text-amber-400" />
+        <AnalystCard title="Alpha Product" value={growth.top_product} icon={ShoppingBag} colorClass="text-blue-400" />
+        <AnalystCard title="AI Fidelity" value={`${growth.forecast_accuracy}%`} icon={Brain} colorClass="text-rose-400" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 glass p-8">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Activity size={18} className="text-indigo-400" /> Revenue Growth vs Prediction
-            </h3>
+        <div className="lg:col-span-2 glass p-8 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+            <BarChart3 size={120} />
           </div>
-          <div className="h-[300px]">
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <h3 className="text-xl font-black text-white uppercase tracking-tight">Revenue Dynamics</h3>
+              <p className="text-xs text-slate-500 font-bold">Historical Performance vs AI Benchmarks</p>
+            </div>
+            <div className="flex gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-indigo-500" />
+                <span className="text-[10px] font-black text-slate-400 uppercase">Actual</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                <span className="text-[10px] font-black text-slate-400 uppercase">Profit</span>
+              </div>
+            </div>
+          </div>
+          <div className="h-[350px]">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={data.monthly}>
+                <defs>
+                  <linearGradient id="analystRev" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
                 <XAxis dataKey="month" stroke="#64748b" fontSize={10} axisLine={false} tickLine={false} />
                 <YAxis stroke="#64748b" fontSize={10} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #ffffff10', borderRadius: '12px' }} />
-                <Area type="monotone" dataKey="revenue" fill="#6366f1" fillOpacity={0.1} stroke="#6366f1" strokeWidth={3} />
-                <Line type="monotone" dataKey="profit" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #ffffff10', borderRadius: '16px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)' }} 
+                  itemStyle={{ fontSize: '12px', fontWeight: '900', textTransform: 'uppercase' }}
+                />
+                <Area type="monotone" dataKey="revenue" fill="url(#analystRev)" stroke="#6366f1" strokeWidth={4} />
+                <Line type="monotone" dataKey="profit" stroke="#10b981" strokeWidth={3} dot={{ r: 6, fill: '#10b981', strokeWidth: 2, stroke: '#0f172a' }} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>
-        <div className="glass p-8">
-          <h3 className="text-lg font-bold text-white mb-6">Regional Sales Mix</h3>
-          <div className="h-[250px]">
+        <div className="glass p-8 flex flex-col">
+          <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2">Geo-Distribution</h3>
+          <p className="text-xs text-slate-500 font-bold mb-8">Sales Concentration by Neural Region</p>
+          <div className="flex-1 flex items-center justify-center min-h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={data.byRegion} dataKey="revenue" nameKey="region" cx="50%" cy="50%" innerRadius={60} outerRadius={80}>
+                <Pie data={data.byRegion} dataKey="revenue" nameKey="region" cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={8}>
                   {data.byRegion.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'][index % 5]} />
+                    <Cell key={`cell-${index}`} fill={['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'][index % 5]} stroke="none" />
                   ))}
                 </Pie>
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="grid grid-cols-2 gap-2 mt-4">
+          <div className="grid grid-cols-2 gap-3 mt-6">
             {data.byRegion.map((r, i) => (
-              <div key={r.region} className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase">
+              <div key={r.region} className="flex items-center gap-3 p-2 bg-white/5 rounded-xl border border-white/5">
                 <span className="w-2 h-2 rounded-full" style={{ background: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'][i % 5] }} />
-                {r.region}
+                <span className="text-[10px] font-black text-slate-300 uppercase truncate">{r.region}</span>
               </div>
             ))}
           </div>
@@ -307,21 +331,38 @@ const InventoryIntelligence = ({ inventory }) => (
 );
 
 const AIInsights = ({ insights }) => (
-  <div className="glass p-8">
-    <SectionHeader title="Automated Business Insights" sub="AI-driven suggestions and market trends" icon={Sparkles} colorClass="text-emerald-400" />
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  <div className="glass p-8 relative overflow-hidden">
+    <div className="absolute top-0 right-0 p-8 opacity-5">
+      <Brain size={160} />
+    </div>
+    <div className="flex items-center gap-4 mb-10">
+      <div className="p-4 bg-emerald-500/10 rounded-2xl text-emerald-400 border border-emerald-500/20 shadow-lg shadow-emerald-500/5">
+        <Sparkles size={24} />
+      </div>
+      <div>
+        <h3 className="text-2xl font-black text-white uppercase tracking-tight">Intelligence Stream</h3>
+        <p className="text-sm text-slate-500 font-bold uppercase tracking-widest">Real-time Cognitive Insights</p>
+      </div>
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {insights.map(insight => (
-        <div key={insight.id} className="p-5 bg-slate-800/40 rounded-2xl border border-white/5 flex gap-4 hover:border-white/10 transition-all">
-          <div className={`p-3 h-fit rounded-xl bg-slate-900 ${
-            insight.type === 'positive' ? 'text-emerald-400' : 
-            insight.type === 'negative' ? 'text-rose-400' : 'text-indigo-400'
+        <div key={insight.id} className="p-6 bg-slate-800/30 rounded-[2rem] border border-white/5 flex flex-col gap-4 hover:border-indigo-500/30 transition-all group relative overflow-hidden">
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl ${
+            insight.type === 'positive' ? 'bg-emerald-500/10 text-emerald-400' : 
+            insight.type === 'negative' ? 'bg-rose-500/10 text-rose-400' : 'bg-indigo-500/10 text-indigo-400'
           }`}>
             {insight.type === 'positive' ? <TrendingUp size={20} /> : insight.type === 'negative' ? <TrendingDown size={20} /> : <Zap size={20} />}
           </div>
           <div>
-            <p className="text-sm font-bold text-white leading-relaxed">{insight.text}</p>
-            <p className="text-[10px] text-slate-500 font-bold uppercase mt-2">Insight Generated 2m ago</p>
+            <p className="text-sm font-black text-white leading-relaxed mb-4">{insight.text}</p>
+            <div className="flex items-center justify-between pt-4 border-t border-white/5">
+              <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Fidelity: High</span>
+              <span className="text-[10px] text-indigo-400 font-bold flex items-center gap-1 cursor-pointer hover:underline">
+                View Proof <ChevronRight size={10} />
+              </span>
+            </div>
           </div>
+          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-white/5 to-transparent rounded-bl-full translate-x-12 -translate-y-12 group-hover:translate-x-8 group-hover:-translate-y-8 transition-transform" />
         </div>
       ))}
     </div>

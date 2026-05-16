@@ -236,88 +236,59 @@ const UserManagement = ({ data, onAction }) => (
   <div className="glass p-0 overflow-hidden">
     <div className="p-8 border-b border-white/5 bg-slate-900/20 flex justify-between items-center">
       <div>
-        <h3 className="text-xl font-black text-white">Active Directory</h3>
-        <p className="text-xs text-slate-500">Manage {data.users.total} platform members and their permissions</p>
-      </div>
-      <div className="flex gap-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
-          <input 
-            type="text" 
-            placeholder="Search users..." 
-            className="pl-10 pr-4 py-2 bg-slate-800/50 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:ring-2 ring-indigo-500/50"
-          />
-        </div>
+        <h3 className="text-xl font-black text-white uppercase tracking-tight">Active Directory</h3>
+        <p className="text-xs text-slate-500 font-bold">Manage {data.users.total} enterprise identities</p>
       </div>
     </div>
     <div className="overflow-x-auto">
-      <table className="w-full text-left">
-        <thead className="bg-slate-800/30 text-[10px] uppercase font-bold text-slate-500 tracking-widest">
+      <table className="w-full text-left border-collapse">
+        <thead className="bg-slate-800/30 text-[10px] uppercase font-black text-slate-500 tracking-[0.2em]">
           <tr>
-            <th className="px-8 py-4">User Identity</th>
-            <th className="px-8 py-4">Security Role</th>
-            <th className="px-8 py-4">Status</th>
-            <th className="px-8 py-4 text-right">Actions</th>
+            <th className="px-8 py-5">Identity Profile</th>
+            <th className="px-8 py-5">Organization / Dept</th>
+            <th className="px-8 py-5">Role & Clearance</th>
+            <th className="px-8 py-5">System Status</th>
+            <th className="px-8 py-5 text-right">Audit</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-white/5">
           {(data.users.list || []).map(user => (
-            <tr key={user.id} className="hover:bg-white/5 transition-colors group">
-              <td className="px-8 py-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-indigo-400 font-black">
+            <tr key={user.id} className="hover:bg-white/5 transition-all group">
+              <td className="px-8 py-5">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-black shadow-inner">
                     {user.username?.[0]?.toUpperCase() ?? 'U'}
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-white">{user.username}</p>
-                    <p className="text-xs text-slate-500">{user.email}</p>
+                    <p className="text-sm font-black text-white tracking-tight">{user.username}</p>
+                    <p className="text-[10px] text-slate-500 font-bold">{user.email}</p>
                   </div>
                 </div>
               </td>
-              <td className="px-8 py-4">
-                <select 
-                  value={user.role} 
-                  onChange={(e) => onAction(user.id, 'role', e.target.value)}
-                  className="bg-slate-800 text-[10px] font-black uppercase text-slate-300 border border-white/10 rounded-lg px-2 py-1 outline-none"
-                >
-                  <option value="Admin">Admin</option>
-                  <option value="Analyst">Analyst</option>
-                  <option value="Manager">Manager</option>
-                </select>
-              </td>
-              <td className="px-8 py-4">
-                <div className="flex items-center gap-4">
-                  <button 
-                    onClick={() => onAction(user.id, 'verify')}
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
-                      user.is_verified 
-                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
-                        : 'bg-red-500/10 border-red-500/20 text-red-400'
-                    }`}
-                  >
-                    <div className={`w-1.5 h-1.5 rounded-full ${user.is_verified ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
-                    <span className="text-[10px] font-black uppercase">{user.is_verified ? 'Verified' : 'Unverified'}</span>
-                  </button>
-                  <button 
-                    onClick={() => onAction(user.id, 'active')}
-                    className={`text-[10px] font-bold ${user.is_active ? 'text-indigo-400' : 'text-slate-500'}`}
-                  >
-                    {user.is_active ? 'ENABLED' : 'DISABLED'}
-                  </button>
+              <td className="px-8 py-5">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{user.organization || 'RetailPulse'}</span>
+                  <span className="text-[10px] font-bold text-slate-500">{user.department || 'Main HQ'}</span>
                 </div>
               </td>
-              <td className="px-8 py-4 text-right">
-                <div className="flex justify-end gap-2">
-                  <button 
-                    onClick={() => onAction(user.id, 'delete')}
-                    className="p-2 text-slate-500 hover:text-red-400 transition-colors bg-white/5 rounded-lg"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                  <button className="p-2 text-slate-500 hover:text-white transition-colors bg-white/5 rounded-lg">
-                    <MoreHorizontal size={14} />
-                  </button>
+              <td className="px-8 py-5">
+                <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                  user.role === 'Admin' ? 'bg-purple-500/10 border-purple-500/30 text-purple-400' :
+                  user.role === 'Analyst' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-slate-500/10 border-slate-500/30 text-slate-400'
+                }`}>
+                  {user.role}
+                </span>
+              </td>
+              <td className="px-8 py-5">
+                <div className="flex items-center gap-3">
+                  <div className={`w-2 h-2 rounded-full ${user.is_verified ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]'}`} />
+                  <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{user.is_verified ? 'Verified' : 'Pending'}</span>
                 </div>
+              </td>
+              <td className="px-8 py-5 text-right">
+                <button onClick={() => onAction(user.id, 'delete')} className="p-2.5 bg-red-500/5 hover:bg-red-500 hover:text-white border border-red-500/10 rounded-xl text-red-400 transition-all">
+                  <Trash2 size={14} />
+                </button>
               </td>
             </tr>
           ))}
@@ -488,41 +459,95 @@ const AlertCenter = ({ data }) => (
 
 const SecurityAccess = ({ data }) => (
   <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-    <div className="glass p-8 lg:col-span-1">
-      <h3 className="text-xl font-black text-white mb-6">Security Perimeter</h3>
-      <div className="space-y-6">
-        <div className="p-5 bg-slate-900/50 rounded-2xl border border-white/5">
-          <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Active JWT Tokens</p>
-          <p className="text-3xl font-black text-indigo-400">{data.security.jwt_active_tokens}</p>
+    <div className="lg:col-span-1 space-y-6">
+      <div className="glass p-8 relative overflow-hidden">
+        <div className="flex justify-between items-start mb-6">
+          <div className="p-4 bg-indigo-500/10 rounded-2xl text-indigo-400 border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
+            <Shield size={24} />
+          </div>
+          <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 uppercase tracking-widest animate-pulse">Live Radar</span>
         </div>
-        <div className="p-5 bg-slate-900/50 rounded-2xl border border-white/5">
-          <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Threat Level</p>
-          <p className="text-3xl font-black text-emerald-400 flex items-center gap-3">
-            <ShieldCheck size={28} /> SECURE
-          </p>
+        <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2">Security Perimeter</h3>
+        <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-8">System Shield Operational</p>
+        
+        <div className="space-y-4">
+          <div className="p-5 bg-slate-900/50 rounded-2xl border border-white/5 group hover:border-indigo-500/30 transition-all">
+            <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] mb-1">Active JWT Mesh</p>
+            <p className="text-3xl font-black text-white tabular-nums">{data.security.jwt_active_tokens} <span className="text-xs text-indigo-400 font-bold">TOKENS</span></p>
+          </div>
+          <div className="p-5 bg-slate-900/50 rounded-2xl border border-white/5 group hover:border-emerald-500/30 transition-all">
+            <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] mb-1">System Integrity</p>
+            <p className="text-3xl font-black text-emerald-400">99.9% <span className="text-xs font-bold">SECURE</span></p>
+          </div>
         </div>
-        <button className="w-full py-4 bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 font-black text-sm rounded-2xl hover:bg-indigo-600/20 transition-all">
-          Rotate Encryption Keys
-        </button>
+      </div>
+
+      <div className="glass p-8 border-amber-500/20">
+        <h4 className="text-xs font-black text-amber-500 uppercase tracking-widest mb-6 flex items-center gap-2">
+          <AlertTriangle size={14} /> Security Alerts
+        </h4>
+        <div className="space-y-4">
+          {(data.security.events || []).map(event => (
+            <div key={event.id} className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-xl flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-black text-white uppercase">{event.type}</p>
+                <p className="text-[9px] text-amber-500/70 font-bold uppercase">{event.ip} • {event.time}</p>
+              </div>
+              <span className="text-[9px] font-black px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full">{event.status}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
-    <div className="lg:col-span-2 glass p-8">
-      <h3 className="text-xl font-black text-white mb-6">Live Login History</h3>
-      <div className="space-y-4">
-        {data.security.login_history.map((log, i) => (
-          <div key={i} className="flex items-center justify-between p-4 bg-slate-800/30 rounded-xl border border-white/5">
-            <div className="flex items-center gap-4">
-              <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-400">
-                <UserCheck size={14} />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-white">{log.user}</p>
-                <p className="text-[10px] text-slate-500 font-bold uppercase">{log.ip} • {log.location}</p>
-              </div>
-            </div>
-            <span className="text-xs text-slate-400 font-medium">{log.time}</span>
-          </div>
-        ))}
+
+    <div className="lg:col-span-2 glass p-0 overflow-hidden">
+      <div className="p-8 border-b border-white/5 bg-slate-900/20 flex justify-between items-center">
+        <div>
+          <h3 className="text-xl font-black text-white uppercase tracking-tight">Active Identity Sessions</h3>
+          <p className="text-xs text-slate-500 font-bold">Real-time enterprise authorization log</p>
+        </div>
+        <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+          <Activity size={14} className="text-emerald-400 animate-pulse" />
+          <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">{data.security.sessions.length} ACTIVE</span>
+        </div>
+      </div>
+      <div className="overflow-y-auto max-h-[600px] scrollbar-none">
+        <table className="w-full text-left">
+          <thead className="sticky top-0 bg-slate-900 text-[10px] uppercase font-black text-slate-500 tracking-widest z-10">
+            <tr>
+              <th className="px-8 py-5">Session Node</th>
+              <th className="px-8 py-5">Device Architecture</th>
+              <th className="px-8 py-5">Geolocation</th>
+              <th className="px-8 py-5 text-right">Access Time</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {(data.security.sessions || []).map(session => (
+              <tr key={session.id} className="hover:bg-white/5 transition-all">
+                <td className="px-8 py-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-indigo-400">
+                      <Terminal size={14} />
+                    </div>
+                    <span className="text-xs font-black text-white uppercase tabular-nums">{session.ip || 'INTERNAL'}</span>
+                  </div>
+                </td>
+                <td className="px-8 py-5">
+                  <p className="text-[10px] text-slate-400 font-bold truncate max-w-[200px]">{session.device || 'Enterprise Workstation'}</p>
+                </td>
+                <td className="px-8 py-5">
+                  <div className="flex items-center gap-2">
+                    <Globe size={12} className="text-slate-500" />
+                    <span className="text-[10px] font-black text-slate-300 uppercase">{session.location || 'Encrypted'}</span>
+                  </div>
+                </td>
+                <td className="px-8 py-5 text-right">
+                  <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{new Date(session.time).toLocaleTimeString()}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
