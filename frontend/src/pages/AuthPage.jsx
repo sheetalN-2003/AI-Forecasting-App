@@ -15,12 +15,14 @@ const ROLES = [
   { value: 'Admin', label: 'System Admin', color: 'purple' },
 ];
 
-const InputField = ({ icon: Icon, type = 'text', placeholder, value, onChange, rightIcon, disabled, label }) => (
+const InputField = ({ icon: Icon, type = 'text', placeholder, value, onChange, rightIcon, disabled, label, id, name }) => (
   <div className="space-y-1.5">
-    {label && <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">{label}</label>}
+    {label && <label htmlFor={id} className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">{label}</label>}
     <div className="relative">
       <Icon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
       <input
+        id={id}
+        name={name}
         type={type}
         placeholder={placeholder}
         value={value || ''}
@@ -148,8 +150,8 @@ export const AuthPage = () => {
 
           {mode === 'login' ? (
             <form onSubmit={handleLogin} className="space-y-6">
-              <InputField icon={User} label="Identity" placeholder="Username" value={form.username} onChange={f('username')} />
-              <InputField icon={Lock} label="Access Key" type={showPass ? 'text' : 'password'} placeholder="••••••••" value={form.password} onChange={f('password')}
+              <InputField id="login-username" name="username" icon={User} label="Identity" placeholder="Username" value={form.username} onChange={f('username')} />
+              <InputField id="login-password" name="password" icon={Lock} label="Access Key" type={showPass ? 'text' : 'password'} placeholder="••••••••" value={form.password} onChange={f('password')}
                 rightIcon={<button type="button" onClick={() => setShowPass(!showPass)} className="text-slate-600">{showPass ? <EyeOff size={16} /> : <Eye size={16} />}</button>}
               />
               {error && <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-2xl text-red-400 text-[10px] font-bold flex items-center gap-3"><AlertCircle size={16}/>{error}</div>}
@@ -162,13 +164,13 @@ export const AuthPage = () => {
               {step === 'form' ? (
                 <form onSubmit={handleRegisterInit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <InputField icon={User} label="Full Name" placeholder="John Doe" value={form.name} onChange={f('name')} />
-                    <InputField icon={Terminal} label="Username" placeholder="jdoe" value={form.username} onChange={f('username')} />
+                    <InputField id="reg-name" name="name" icon={User} label="Full Name" placeholder="John Doe" value={form.name} onChange={f('name')} />
+                    <InputField id="reg-username" name="username" icon={Terminal} label="Username" placeholder="jdoe" value={form.username} onChange={f('username')} />
                   </div>
-                  <InputField icon={Mail} label="Corporate Email" placeholder="name@company.com" value={form.email} onChange={f('email')} />
+                  <InputField id="reg-email" name="email" icon={Mail} label="Corporate Email" placeholder="name@company.com" value={form.email} onChange={f('email')} />
                   <div className="grid grid-cols-2 gap-4">
-                    <InputField icon={Lock} label="Secret Key" type="password" placeholder="••••••••" value={form.password} onChange={f('password')} />
-                    <InputField icon={ShieldCheck} label="Confirm Key" type="password" placeholder="••••••••" value={form.confirmPassword} onChange={f('confirmPassword')} />
+                    <InputField id="reg-password" name="password" icon={Lock} label="Secret Key" type="password" placeholder="••••••••" value={form.password} onChange={f('password')} />
+                    <InputField id="reg-confirm" name="confirmPassword" icon={ShieldCheck} label="Confirm Key" type="password" placeholder="••••••••" value={form.confirmPassword} onChange={f('confirmPassword')} />
                   </div>
                   
                   <div className="space-y-1.5">
