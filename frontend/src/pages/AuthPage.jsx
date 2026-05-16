@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   Eye, EyeOff, Mail, Lock, User, ShieldCheck, ChevronRight,
   Loader2, AlertCircle, CheckCircle2, Sparkles, RefreshCw,
-  ArrowLeft, Chrome
+  ArrowLeft, Globe
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -239,7 +239,7 @@ export const AuthPage = () => {
 
               <button onClick={handleGoogleLogin} disabled={loading}
                 className="w-full flex items-center justify-center gap-3 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm font-bold text-slate-300 transition-all disabled:opacity-50">
-                <Chrome size={18} className="text-blue-400" />
+                <Globe size={18} className="text-blue-400" />
                 Continue with Google
               </button>
 
