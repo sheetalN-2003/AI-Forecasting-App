@@ -1,0 +1,183 @@
+/* ─── Google Fonts ─────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #6366f1;
+  --primary-hover: #4f46e5;
+  --bg-dark: #0f172a;
+  --bg-card: #1e293b;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --accent: #10b981;
+}
+
+/* ─── Base ──────────────────────────────────────────────────────────────────── */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    @apply bg-slate-950 text-slate-50 antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+    background:
+      radial-gradient(ellipse 80% 60% at 80% -10%, rgba(99,102,241,0.15) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 50% at -10% 80%, rgba(16,185,129,0.08) 0%, transparent 60%),
+      #0f172a;
+    min-height: 100vh;
+  }
+}
+
+/* ─── Glassmorphism card ─────────────────────────────────────────────────────── */
+.glass {
+  @apply bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+.glass-auth {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(24px);
+  @apply border border-white/10 rounded-3xl;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.07);
+}
+
+/* ─── Buttons ────────────────────────────────────────────────────────────────── */
+.btn-primary {
+  @apply px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl
+         transition-all duration-200 font-semibold text-sm
+         shadow-lg shadow-indigo-500/25 active:scale-95;
+}
+
+/* ─── Form inputs ────────────────────────────────────────────────────────────── */
+.input-field {
+  @apply w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 ring-indigo-500/50 transition-all;
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+select.input-field option {
+  @apply bg-slate-900 text-slate-100;
+}
+
+/* ─── Scrollbars ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { @apply bg-transparent; }
+::-webkit-scrollbar-thumb  { @apply bg-slate-700 rounded-full; }
+::-webkit-scrollbar-thumb:hover { @apply bg-slate-600; }
+
+.custom-scroll::-webkit-scrollbar        { width: 4px; }
+.custom-scroll::-webkit-scrollbar-track  { @apply bg-transparent; }
+.custom-scroll::-webkit-scrollbar-thumb  { @apply bg-slate-800 rounded-full; }
+
+/* ─── Auth page animated blobs ───────────────────────────────────────────────── */
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.25;
+  animation: blob-float 8s ease-in-out infinite;
+}
+
+.blob-1 {
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, #6366f1, #4f46e5);
+  top: -160px; right: -120px;
+  animation-delay: 0s;
+}
+
+.blob-2 {
+  width: 380px; height: 380px;
+  background: radial-gradient(circle, #10b981, #059669);
+  bottom: -100px; left: -80px;
+  animation-delay: -3s;
+}
+
+.blob-3 {
+  width: 280px; height: 280px;
+  background: radial-gradient(circle, #8b5cf6, #7c3aed);
+  top: 40%; left: 45%;
+  animation-delay: -5s;
+}
+
+@keyframes blob-float {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  33%       { transform: translateY(-30px) scale(1.05); }
+  66%       { transform: translateY(20px) scale(0.97); }
+}
+
+/* ─── Loader spinner ─────────────────────────────────────────────────────────── */
+.loader-spin {
+  width: 20px; height: 20px;
+  border: 2.5px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Pulse animations ───────────────────────────────────────────────────────── */
+@keyframes pulse-slow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.5); }
+  50%       { box-shadow: 0 0 0 16px rgba(99,102,241,0); }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 2.4s ease-in-out infinite;
+}
+
+/* ─── Recharts tooltip override ──────────────────────────────────────────────── */
+.recharts-tooltip-wrapper { outline: none !important; }
+
+/* ─── Slide-in animations ────────────────────────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slide-in-from-bottom {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-in { animation-fill-mode: both; }
+.fade-in    { animation-name: fade-in; }
+.slide-in-from-bottom { animation-name: slide-in-from-bottom; }
+.duration-500 { animation-duration: 500ms; }
+
+/* ─── Gradient text utility ──────────────────────────────────────────────────── */
+.gradient-text {
+  background: linear-gradient(135deg, #6366f1, #10b981);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Range input ─────────────────────────────────────────────────────────────── */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: #1e293b;
+  border-radius: 9999px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  background: #6366f1;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(99,102,241,0.5);
+  cursor: pointer;
+}
