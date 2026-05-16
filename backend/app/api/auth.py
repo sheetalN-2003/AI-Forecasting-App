@@ -122,7 +122,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-PLACEHOLDER_VALUES = {"your-email@gmail.com", "your-app-password", "localhost", ""}
+PLACEHOLDER_VALUES = {"your-email@gmail.com", "your-app-password", ""}
 
 def _check_smtp_config():
     """Raise HTTP 503 immediately if SMTP is not properly configured."""
@@ -140,7 +140,7 @@ def _check_smtp_config():
         raise HTTPException(
             status_code=503,
             detail=f"SMTP misconfiguration: {', '.join(missing)} is missing or contains a placeholder value. "
-                   "Update your .env file with real credentials and restart the server."
+                   "Update your environment variables with real credentials and redeploy."
         )
 
 def send_otp_email(email: str, otp: str, expiry_minutes: int = 10):

@@ -44,21 +44,21 @@ def seed_users():
             User(
                 username="admin",
                 email="admin@retailpulse.com",
-                hashed_password=hash_password("admin123"),
+                hashed_password=hash_password("Admin@123456!"),
                 role="Admin",
                 is_verified=1
             ),
             User(
                 username="analyst",
                 email="analyst@retailpulse.com", 
-                hashed_password=hash_password("analyst123"),
+                hashed_password=hash_password("Analyst@123456!"),
                 role="Analyst",
                 is_verified=1
             ),
             User(
                 username="manager",
                 email="manager@retailpulse.com",
-                hashed_password=hash_password("manager123"),
+                hashed_password=hash_password("Manager@123456!"),
                 role="Manager",
                 is_verified=1
             )
@@ -261,9 +261,9 @@ def main():
     
     print("\n🚀 You can now run the app with real data!")
     print("   Login credentials:")
-    print("   - admin / admin123 (Admin role)")
-    print("   - analyst / analyst123 (Analyst role)")  
-    print("   - manager / manager123 (Employee role)")
+    print("   - admin / Admin@123456! (Admin role)")
+    print("   - analyst / Analyst@123456! (Analyst role)")  
+    print("   - manager / Manager@123456! (Manager role)")
 
 if __name__ == "__main__":
     main()
