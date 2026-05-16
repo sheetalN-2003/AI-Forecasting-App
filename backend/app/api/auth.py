@@ -31,12 +31,16 @@ class UserCreate(BaseModel):
     email: str
     password: str
     role: str = "Manager"
+    department: Optional[str] = None
+    organization: Optional[str] = None
 
 class UserResponse(BaseModel):
     id: int
     username: str
     email: str
     role: str
+    department: Optional[str] = None
+    organization: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -182,7 +186,7 @@ def request_verification(req: EmailOnlyRequest):
     # Send real email if SMTP is configured, otherwise print for dev
     send_verification_email(req.email, code)
     print(f"📧 VERIFICATION CODE FOR {req.email}: {code}")
-    # Return code in dev mode so UI can display it
+    # Return code so UI can auto-fill for demo/dev onboarding
     return {"message": "Verification code sent", "code": code}
 
 @router.post("/verify-code")
@@ -281,14 +285,16 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
         email=user_data.email,
         hashed_password=hash_password(user_data.password),
         role=user_data.role,
+        department=user_data.department,
+        organization=user_data.organization,
         is_verified=True # Assuming verified by pre-signup step
     )
     db.add(new_user)
     db.commit()   
     db.refresh(new_user)
 
-    token = create_access_token({"sub": new_user.username})
-    return {"access_token": token, "token_type": "bearer", "user": new_user}
+    access_token = create_access_token({"sub": new_user.username})
+    return {"access_token": access_token, "token_type": "bearer", "user": new_user}
 
 from app.models.schemas import User, LoginSession
 
@@ -322,11 +328,30 @@ def get_login_sessions(db: Session = Depends(get_db), current_user: User = Depen
 @router.post("/login", response_model=Token)
 def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == form_data.username).first()
+    
+    # Security Event System: Track Failed Logins
     if not user or not verify_password(form_data.password, user.hashed_password):
+        if user:
+            user.failed_login_attempts += 1
+            if user.failed_login_attempts >= 5:
+                # Alert Admin about potential brute force
+                from app.models.schemas import Notification
+                alert = Notification(
+                    title="Security Alert: Failed Logins",
+                    message=f"Account {user.username} has 5+ failed login attempts. Potential brute force.",
+                    type="warning",
+                    priority="high"
+                )
+                db.add(alert)
+            db.commit()
+            
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
         )
+    
+    # Reset failed attempts on success
+    user.failed_login_attempts = 0
     
     # Check for 2FA
     if user.two_factor_enabled:
@@ -342,7 +367,7 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db
             }
         }
 
-    # Record Session
+    # Record Session (Monitoring Philosophy)
     ip = request.client.host if request.client else "127.0.0.1"
     ua = request.headers.get("user-agent", "Unknown")
     
@@ -350,6 +375,7 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db
     locations = ["New York, US", "London, UK", "Tokyo, JP", "Mumbai, IN", "Berlin, DE"]
     loc = locations[hash(ip) % len(locations)]
     
+    from app.models.schemas import LoginSession
     new_session = LoginSession(
         user_id=user.id,
         ip_address=ip,
@@ -357,10 +383,11 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db
         location=loc
     )
     db.add(new_session)
+    user.last_login = datetime.utcnow()
     db.commit()
 
-    token = create_access_token({"sub": user.username})
-    return {"access_token": token, "token_type": "bearer", "user": user}
+    access_token = create_access_token({"sub": user.username})
+    return {"access_token": access_token, "token_type": "bearer", "user": user}
 
 @router.get("/me", response_model=UserResponse)
 def read_me(current_user: User = Depends(get_current_user)):

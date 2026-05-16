@@ -21,6 +21,8 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     is_verified = Column(Boolean, default=False, nullable=False)
     verification_token = Column(String, nullable=True)
+    department = Column(String, nullable=True)
+    organization = Column(String, nullable=True)
     
     # 2FA Fields
     two_factor_enabled = Column(Boolean, default=False, nullable=False)
