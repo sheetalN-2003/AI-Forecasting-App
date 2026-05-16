@@ -4,42 +4,39 @@ import { useAuth } from '../context/AuthContext';
 import {
   Eye, EyeOff, Mail, Lock, User, ShieldCheck, ChevronRight,
   Loader2, AlertCircle, CheckCircle2, Sparkles, RefreshCw,
-  ArrowLeft, Globe, Shield
+  ArrowLeft, Globe, Shield, Terminal
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const ROLES = [
-  { value: 'Manager', label: 'Store Manager', desc: 'Sales dashboards & real-time monitoring', color: 'emerald' },
-  { value: 'Analyst', label: 'Data Analyst', desc: 'Advanced analytics, forecasting & AI insights', color: 'indigo' },
-  { value: 'Admin', label: 'System Admin', desc: 'Full platform control & user management', color: 'purple' },
+  { value: 'User', label: 'Store User', color: 'emerald' },
+  { value: 'Analyst', label: 'Data Analyst', color: 'indigo' },
+  { value: 'Admin', label: 'System Admin', color: 'purple' },
 ];
 
-const roleColors = { 
-  emerald: 'border-emerald-500/60 bg-emerald-500/10', 
-  indigo: 'border-indigo-500/60 bg-indigo-500/10', 
-  purple: 'border-purple-500/60 bg-purple-500/10' 
-};
-
-const InputField = ({ icon: Icon, type = 'text', placeholder, value, onChange, rightIcon, disabled }) => (
-  <div className="relative">
-    <Icon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
-    <input
-      type={type}
-      placeholder={placeholder}
-      value={value || ''}
-      onChange={onChange}
-      disabled={disabled}
-      className="w-full bg-slate-800/60 border border-white/10 focus:border-indigo-500/60 rounded-xl pl-11 pr-11 py-3 text-sm text-slate-200 placeholder-slate-500 outline-none transition-all disabled:opacity-50"
-    />
-    {rightIcon && <div className="absolute right-3 top-1/2 -translate-y-1/2">{rightIcon}</div>}
+const InputField = ({ icon: Icon, type = 'text', placeholder, value, onChange, rightIcon, disabled, label }) => (
+  <div className="space-y-1.5">
+    {label && <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">{label}</label>}
+    <div className="relative">
+      <Icon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+      <input
+        type={type}
+        placeholder={placeholder}
+        value={value || ''}
+        onChange={onChange}
+        disabled={disabled}
+        className="w-full bg-slate-900/50 border border-white/5 focus:border-indigo-500/40 rounded-xl pl-11 pr-11 py-3 text-sm text-slate-200 placeholder-slate-600 outline-none transition-all disabled:opacity-50"
+      />
+      {rightIcon && <div className="absolute right-3 top-1/2 -translate-y-1/2">{rightIcon}</div>}
+    </div>
   </div>
 );
 
 export const AuthPage = () => {
   const { login } = useAuth();
   const [mode, setMode] = useState('login'); // 'login' | 'register' 
-  const [step, setStep] = useState('choice'); // 'choice' | 'form' | 'otp' | '2fa'
+  const [step, setStep] = useState('form'); // 'form' | 'otp'
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -47,9 +44,8 @@ export const AuthPage = () => {
   const otpRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
 
   const [form, setForm] = useState({
-    username: '', email: '', password: '', confirmPassword: '', 
-    role: 'Manager', otp: ['', '', '', '', '', ''],
-    forgotEmail: '', department: '', organization: ''
+    name: '', username: '', email: '', password: '', confirmPassword: '', 
+    role: 'User', otp: ['', '', '', '', '', '']
   });
 
   const handleOtpChange = (index, value) => {
@@ -64,218 +60,178 @@ export const AuthPage = () => {
     if (e.key === 'Backspace' && !form.otp[index] && index > 0) otpRefs[index - 1].current?.focus();
   };
 
-  const autoFillOtp = (code) => {
-    const digits = code.toString().split('').slice(0, 6);
-    setForm(p => ({ ...p, otp: digits }));
-    setSuccess(`✉️ Verification code generated: ${code}. Auto-filled for your convenience.`);
-  };
-
   const f = (key) => (e) => setForm(p => ({ ...p, [key]: e.target.value }));
   const otpCode = form.otp.join('');
 
-  const requestOTP = async () => {
-    if (!form.email) { setError('Please enter your email.'); return; }
+  // --- FLOW 1: Registration ---
+  const handleRegisterInit = async (e) => {
+    e?.preventDefault();
+    if (form.password !== form.confirmPassword) { setError('Passwords do not match'); return; }
     setLoading(true); setError(''); setSuccess('');
     try {
-      const { data } = await axios.post(`${API_BASE}/auth/request-verification`, { email: form.email });
-      if (data.code) autoFillOtp(data.code);
+      const { data } = await axios.post(`${API_BASE}/auth/register-init`, {
+        name: form.name, username: form.username, email: form.email, 
+        password: form.password, role: form.role
+      });
+      setSuccess(data.message);
+      if (data.code) {
+        // Auto-fill for demo
+        const digits = data.code.toString().split('').slice(0, 6);
+        setForm(p => ({ ...p, otp: digits }));
+      }
       setStep('otp');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to connect to authentication server.');
+      setError(err.response?.data?.detail || 'Registration failed');
     } finally { setLoading(false); }
   };
 
-  const verifyOTP = async () => {
-    if (otpCode.length < 6) { setError('Enter all 6 digits.'); return; }
+  const handleVerifyRegistration = async () => {
     setLoading(true); setError('');
     try {
-      await axios.post(`${API_BASE}/auth/verify-code`, { email: form.email, code: otpCode });
-      setStep('details');
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Invalid code. Try again.');
-    } finally { setLoading(false); }
-  };
-
-  const handleRegister = async (e) => {
-    e?.preventDefault();
-    if (form.password !== form.confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
-    setLoading(true); setError('');
-    try {
-      const { data } = await axios.post(`${API_BASE}/auth/register`, {
-        username: form.username,
+      const { data } = await axios.post(`${API_BASE}/auth/verify-registration`, {
         email: form.email,
-        password: form.password,
-        role: form.role,
-        department: form.department,
-        organization: form.organization
+        otp: otpCode,
+        registration_data: {
+          name: form.name, username: form.username, email: form.email, 
+          password: form.password, role: form.role
+        }
       });
       login(data.access_token, data.user);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Registration failed.');
+      setError(err.response?.data?.detail || 'Verification failed');
     } finally { setLoading(false); }
   };
 
+  // --- FLOW 2: Login ---
   const handleLogin = async (e) => {
     e?.preventDefault();
     setLoading(true); setError('');
     try {
-      const form2 = new URLSearchParams();
-      form2.append('username', form.username);
-      form2.append('password', form.password);
-      const { data } = await axios.post(`${API_BASE}/auth/login`, form2, {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-      });
-      if (data.user?.two_factor_required) setStep('2fa');
-      else login(data.access_token, data.user);
+      const payload = new URLSearchParams();
+      payload.append('username', form.username);
+      payload.append('password', form.password);
+      const { data } = await axios.post(`${API_BASE}/auth/login`, payload);
+      login(data.access_token, data.user);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Invalid username or password.');
+      setError(err.response?.data?.detail || 'Invalid credentials');
     } finally { setLoading(false); }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans">
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl animate-pulse" />
-      <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-purple-600/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+    <div className="min-h-screen bg-[#05070a] text-slate-300 flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans">
+      {/* Neural background mesh */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(17,24,39,1)_0%,rgba(5,7,10,1)_100%)]" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full opacity-20 pointer-events-none" 
+        style={{ backgroundImage: 'radial-gradient(#1e293b 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
 
-      <div className="w-full max-w-md relative z-10">
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-indigo-500/30">
-              <Sparkles size={24} className="text-white" />
-            </div>
-            <div className="text-left">
-              <h1 className="text-3xl font-black text-white tracking-tighter">RetailPulse <span className="text-indigo-500">AI</span></h1>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em]">Enterprise Analytics Environment</p>
-            </div>
+      <div className="w-full max-w-lg relative z-10">
+        <div className="text-center mb-10 space-y-2">
+          <div className="inline-flex items-center gap-3 p-2 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 mb-4">
+            <Shield size={28} className="text-indigo-500" />
           </div>
+          <h1 className="text-3xl font-black text-white tracking-tighter">RetailPulse <span className="text-indigo-500">AI</span></h1>
+          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.3em]">Secure Enterprise Gateway</p>
         </div>
 
-        <div className="glass p-8 relative overflow-hidden">
-          {/* Top Choice Tabs */}
-          {step === 'choice' && (
-            <div className="flex gap-2 p-1 bg-slate-900/60 rounded-xl mb-8">
-              <button onClick={() => setMode('login')} className={`flex-1 py-3 rounded-lg text-sm font-bold transition-all ${mode === 'login' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>Direct Login</button>
-              <button onClick={() => setMode('register')} className={`flex-1 py-3 rounded-lg text-sm font-bold transition-all ${mode === 'register' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>Work Onboarding</button>
+        <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-[2rem] p-8 shadow-2xl shadow-black/50">
+          {/* Mode Switcher */}
+          {step === 'form' && (
+            <div className="flex p-1 bg-black/40 rounded-2xl mb-8">
+              {['login', 'register'].map(m => (
+                <button key={m} onClick={() => { setMode(m); setError(''); }}
+                  className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${mode === m ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-500 hover:text-slate-300'}`}>
+                  {m === 'login' ? 'Authenticate' : 'Onboard'}
+                </button>
+              ))}
             </div>
           )}
 
-          {/* Login Flow */}
-          {mode === 'login' && (
-            <form onSubmit={handleLogin} className="space-y-5">
-              <InputField icon={User} placeholder="Enterprise Username" value={form.username} onChange={f('username')} />
-              <InputField icon={Lock} type={showPass ? 'text' : 'password'} placeholder="Secret Key" value={form.password} onChange={f('password')}
-                rightIcon={<button type="button" onClick={() => setShowPass(s => !s)} className="text-slate-500">{showPass ? <EyeOff size={16} /> : <Eye size={16} />}</button>}
+          {mode === 'login' ? (
+            <form onSubmit={handleLogin} className="space-y-6">
+              <InputField icon={User} label="Identity" placeholder="Username" value={form.username} onChange={f('username')} />
+              <InputField icon={Lock} label="Access Key" type={showPass ? 'text' : 'password'} placeholder="••••••••" value={form.password} onChange={f('password')}
+                rightIcon={<button type="button" onClick={() => setShowPass(!showPass)} className="text-slate-600">{showPass ? <EyeOff size={16} /> : <Eye size={16} />}</button>}
               />
-              {error && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs flex items-center gap-2"><AlertCircle size={14}/>{error}</div>}
-              <button type="submit" disabled={loading} className="w-full btn-primary py-4 flex items-center justify-center gap-2 text-lg font-black shadow-xl shadow-indigo-600/20 transition-transform active:scale-[0.98]">
-                {loading ? <Loader2 size={20} className="animate-spin" /> : <ChevronRight size={20} />}
-                Sign Into Environment
-              </button>
-              <div className="flex items-center gap-4 py-2">
-                <div className="flex-1 h-px bg-white/5" />
-                <span className="text-[10px] text-slate-600 font-bold">OR PROVIDER ACCESS</span>
-                <div className="flex-1 h-px bg-white/5" />
-              </div>
-              <button type="button" onClick={() => alert("Google Identity verification starting...")} className="w-full flex items-center justify-center gap-3 py-3 bg-white/5 border border-white/5 rounded-xl text-sm font-bold text-slate-400 hover:bg-white/10 transition-all">
-                <Globe size={18} className="text-blue-400" /> Use Enterprise Google SSO
+              {error && <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-2xl text-red-400 text-[10px] font-bold flex items-center gap-3"><AlertCircle size={16}/>{error}</div>}
+              <button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-xl shadow-indigo-600/20 transition-all active:scale-[0.98]">
+                {loading ? <Loader2 size={18} className="animate-spin mx-auto" /> : 'Enter Environment'}
               </button>
             </form>
-          )}
+          ) : (
+            <>
+              {step === 'form' ? (
+                <form onSubmit={handleRegisterInit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <InputField icon={User} label="Full Name" placeholder="John Doe" value={form.name} onChange={f('name')} />
+                    <InputField icon={Terminal} label="Username" placeholder="jdoe" value={form.username} onChange={f('username')} />
+                  </div>
+                  <InputField icon={Mail} label="Corporate Email" placeholder="name@company.com" value={form.email} onChange={f('email')} />
+                  <div className="grid grid-cols-2 gap-4">
+                    <InputField icon={Lock} label="Secret Key" type="password" placeholder="••••••••" value={form.password} onChange={f('password')} />
+                    <InputField icon={ShieldCheck} label="Confirm Key" type="password" placeholder="••••••••" value={form.confirmPassword} onChange={f('confirmPassword')} />
+                  </div>
+                  
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">System Authorization</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {ROLES.map(r => (
+                        <button type="button" key={r.value} onClick={() => setForm({...form, role: r.value})}
+                          className={`py-2.5 rounded-xl border-2 text-[10px] font-black transition-all ${form.role === r.value ? `border-${r.color}-500/50 bg-${r.color}-500/10 text-white` : 'border-white/5 bg-white/5 text-slate-500 hover:text-slate-300'}`}>
+                          {r.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-          {/* Register Flow - Step 1: Email */}
-          {mode === 'register' && step === 'choice' && (
-            <div className="space-y-6">
-              <div className="p-5 bg-indigo-500/5 border border-indigo-500/10 rounded-2xl">
-                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Step 1: Identity Verification</p>
-                <p className="text-xs text-slate-400 leading-relaxed">All enterprise accounts must be verified via your corporate email before onboarding.</p>
-              </div>
-              <InputField icon={Mail} placeholder="you@company.com" value={form.email} onChange={f('email')} />
-              {error && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs flex items-center gap-2"><AlertCircle size={14}/>{error}</div>}
-              <button onClick={requestOTP} disabled={loading} className="w-full btn-primary py-4 flex items-center justify-center gap-2 text-lg font-black transition-all">
-                {loading ? <Loader2 size={20} className="animate-spin" /> : <Shield size={20} />}
-                Verify Email <ChevronRight size={20} />
-              </button>
-            </div>
-          )}
-
-          {/* Register Flow - Step 2: OTP */}
-          {mode === 'register' && step === 'otp' && (
-            <div className="space-y-6">
-              <div className="flex items-center gap-3 mb-2">
-                <button onClick={() => setStep('choice')} className="text-slate-400 hover:text-white"><ArrowLeft size={18} /></button>
-                <h2 className="text-lg font-bold text-white">Enter Security Token</h2>
-              </div>
-              {success && <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-[10px] leading-relaxed">{success}</div>}
-              <div className="flex justify-center gap-2">
-                {form.otp.map((d, i) => (
-                  <input key={i} ref={otpRefs[i]} type="text" maxLength={1} value={d} onChange={e => handleOtpChange(i, e.target.value)} onKeyDown={e => handleOtpKeyDown(i, e)}
-                    className="w-12 h-14 text-center text-xl font-black bg-slate-900 border-2 border-white/10 rounded-xl text-white outline-none focus:border-indigo-500"
-                  />
-                ))}
-              </div>
-              <button onClick={verifyOTP} disabled={loading || otpCode.length < 6} className="w-full btn-primary py-4 font-black">Finalize Verification</button>
-            </div>
-          )}
-
-          {/* Register Flow - Step 3: Details */}
-          {mode === 'register' && step === 'details' && (
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div className="flex items-center gap-3 mb-2">
-                <ShieldCheck size={20} className="text-emerald-400" />
-                <h2 className="text-lg font-bold text-white">Identity Configuration</h2>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <InputField icon={User} placeholder="Enterprise ID" value={form.username} onChange={f('username')} />
-                <InputField icon={Globe} placeholder="Organization" value={form.organization} onChange={f('organization')} />
-              </div>
-              <InputField icon={Shield} placeholder="Department" value={form.department} onChange={f('department')} />
-              
-              <InputField icon={Lock} type="password" placeholder="New Secret Key" value={form.password} onChange={f('password')} />
-              <InputField icon={Lock} type="password" placeholder="Confirm Secret Key" value={form.confirmPassword} onChange={f('confirmPassword')} />
-              
-              <div className="p-3 bg-slate-900/80 rounded-xl border border-white/5 space-y-1">
-                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Complexity Requirements</p>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                  <p className={`text-[9px] ${form.password.length >= 12 ? 'text-emerald-400' : 'text-slate-600'}`}>• 12+ Characters</p>
-                  <p className={`text-[9px] ${/[A-Z]/.test(form.password) ? 'text-emerald-400' : 'text-slate-600'}`}>• Uppercase</p>
-                  <p className={`text-[9px] ${/[0-9]/.test(form.password) ? 'text-emerald-400' : 'text-slate-600'}`}>• Number</p>
-                  <p className={`text-[9px] ${/[!@#$%^&*]/.test(form.password) ? 'text-emerald-400' : 'text-slate-600'}`}>• Symbol</p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Authorized Role</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {ROLES.map(r => (
-                    <button type="button" key={r.value} onClick={() => setForm(p => ({ ...p, role: r.value }))}
-                      className={`p-3 rounded-xl border-2 text-center transition-all ${form.role === r.value ? roleColors[r.color] : 'bg-white/5 border-white/5 text-slate-500'}`}>
-                      <p className="text-[10px] font-bold">{r.label}</p>
+                  {error && <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-2xl text-red-400 text-[10px] font-bold flex items-center gap-3"><AlertCircle size={16}/>{error}</div>}
+                  <button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] transition-all">
+                    {loading ? <Loader2 size={18} className="animate-spin mx-auto" /> : 'Request Verification'}
+                  </button>
+                </form>
+              ) : (
+                <div className="space-y-8 animate-in fade-in zoom-in duration-300">
+                  <div className="text-center">
+                    <button onClick={() => setStep('form')} className="text-slate-500 hover:text-indigo-400 transition-colors flex items-center gap-2 text-[10px] font-black uppercase mb-4 mx-auto">
+                      <ArrowLeft size={14} /> Back to Details
                     </button>
-                  ))}
-                </div>
-              </div>
+                    <h2 className="text-xl font-bold text-white mb-2">Verify Identity</h2>
+                    <p className="text-xs text-slate-500">Security token dispatched to <span className="text-indigo-400 font-bold">{form.email}</span></p>
+                  </div>
 
-              {error && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs flex items-center gap-2"><AlertCircle size={14}/>{error}</div>}
-              
-              <button type="submit" disabled={loading} className="w-full btn-primary py-4 font-black shadow-xl shadow-indigo-600/20">
-                {loading ? <Loader2 size={18} className="animate-spin" /> : "Complete Provisioning"}
-              </button>
-            </form>
+                  <div className="flex justify-center gap-3">
+                    {form.otp.map((d, i) => (
+                      <input key={i} ref={otpRefs[i]} type="text" maxLength={1} value={d} onChange={e => handleOtpChange(i, e.target.value)} onKeyDown={e => handleOtpKeyDown(i, e)}
+                        className="w-12 h-16 text-center text-2xl font-black bg-black/40 border border-white/10 rounded-2xl text-white outline-none focus:border-indigo-500 transition-all"
+                      />
+                    ))}
+                  </div>
+
+                  {error && <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-2xl text-red-400 text-[10px] font-bold flex items-center gap-3"><AlertCircle size={16}/>{error}</div>}
+                  <button onClick={handleVerifyRegistration} disabled={loading || otpCode.length < 6} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-xl shadow-indigo-600/20">
+                    {loading ? <Loader2 size={18} className="animate-spin mx-auto" /> : 'Finalize Onboarding'}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
 
-        <div className="mt-8 text-center space-y-2">
-          <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">Enterprise Identity Mesh Enabled</p>
-          <div className="flex items-center justify-center gap-4 text-[9px] text-slate-700 font-medium">
-            <span>AES-256 ENCRYPTION</span>
-            <span className="w-1 h-1 bg-slate-800 rounded-full" />
-            <span>BCRYPT ADAPTIVE HASHING</span>
-            <span className="w-1 h-1 bg-slate-800 rounded-full" />
-            <span>RSA-4096 SIGNATURES</span>
+        <div className="mt-12 flex flex-col items-center gap-4">
+          <div className="flex items-center gap-6">
+            <div className="flex flex-col items-center gap-1">
+              <ShieldCheck size={16} className="text-emerald-500" />
+              <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">RSA-4096</span>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <RefreshCw size={16} className="text-indigo-500" />
+              <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">JWT-ROTATE</span>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <Terminal size={16} className="text-purple-500" />
+              <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">TLS-SECURE</span>
+            </div>
           </div>
+          <p className="text-[9px] text-slate-700 font-bold uppercase tracking-[0.4em]">Multi-Tenant Intelligence Mesh</p>
         </div>
       </div>
     </div>

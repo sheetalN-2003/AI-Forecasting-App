@@ -14,6 +14,7 @@ class User(Base):
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=True)
     username = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
@@ -34,15 +35,24 @@ class User(Base):
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
+class OTPVerification(Base):
+    __tablename__ = "otp_verification"
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, index=True, nullable=False)
+    otp = Column(String, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    verified = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=func.now())
+
 class LoginSession(Base):
     __tablename__ = "login_sessions"
-    
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, index=True, nullable=False)
     ip_address = Column(String, nullable=True)
     user_agent = Column(String, nullable=True)
     location = Column(String, nullable=True)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
+    login_time = Column(DateTime, default=func.now(), nullable=False)
+    status = Column(String, default="active") # active, expired, logged_out
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"

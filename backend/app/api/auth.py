@@ -28,15 +28,17 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 # ─── Pydantic Schemas ─────────────────────────────────────────────────────────
 class UserCreate(BaseModel):
+    name: str
     username: str
-    email: str
+    email: EmailStr
     password: str
-    role: str = "Manager"
+    role: str = "User"
     department: Optional[str] = None
     organization: Optional[str] = None
 
 class UserResponse(BaseModel):
     id: int
+    name: Optional[str]
     username: str
     email: str
     role: str
@@ -48,8 +50,22 @@ class UserResponse(BaseModel):
 
 class Token(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str
     user: UserResponse
+    expires: str = "24h"
+
+class RegisterInitRequest(BaseModel):
+    name: str
+    username: str
+    email: EmailStr
+    password: str
+    role: str
+
+class VerifyRegistrationRequest(BaseModel):
+    email: EmailStr
+    otp: str
+    registration_data: RegisterInitRequest
 
 import hashlib
 
@@ -67,10 +83,19 @@ def hash_password(password: str) -> str:
     pwd_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
     return bcrypt.hashpw(pwd_hash.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
-def create_access_token(data: dict) -> str:
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def create_refresh_token(data: dict) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(days=7)
+    to_encode.update({"exp": expire, "type": "refresh"})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
@@ -179,24 +204,91 @@ class ReportErrorRequest(BaseModel):
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
 
-@router.post("/request-verification")
-def request_verification(req: EmailOnlyRequest):
-    """Send a 6-digit verification code to the provided email before registration"""
-    code = str(secrets.randbelow(899999) + 100000)
-    verification_db[req.email] = code
-    # Send real email if SMTP is configured, otherwise print for dev
-    send_verification_email(req.email, code)
-    print(f"📧 VERIFICATION CODE FOR {req.email}: {code}")
-    # Return code so UI can auto-fill for demo/dev onboarding
-    return {"message": "Verification code sent", "code": code}
+from app.models.schemas import OTPVerification
 
-@router.post("/verify-code")
-def verify_code(req: VerifyCodeRequest):
-    stored = verification_db.get(req.email)
-    if stored and stored == req.code:
-        del verification_db[req.email]  # Consume once used
-        return {"status": "verified"}
-    raise HTTPException(status_code=400, detail="Invalid or expired verification code")
+@router.post("/register-init")
+def register_init(req: RegisterInitRequest, db: Session = Depends(get_db)):
+    """FLOW 1: Step 1 - Validate details and send OTP"""
+    if not is_password_strong(req.password):
+        raise HTTPException(status_code=400, detail="Password too weak (12+ chars, uppercase, number, symbol required)")
+    
+    # Check if user exists
+    if db.query(User).filter((User.username == req.username) | (User.email == req.email)).first():
+        raise HTTPException(status_code=400, detail="Username or email already registered")
+    
+    # Generate OTP
+    otp_code = str(secrets.randbelow(899999) + 100000)
+    expiry = datetime.utcnow() + timedelta(minutes=10)
+    
+    # Save to otp_verification table
+    otp_entry = OTPVerification(email=req.email, otp=otp_code, expires_at=expiry)
+    db.add(otp_entry)
+    db.commit()
+    
+    # Send email (Mocked)
+    print(f"📧 REGISTRATION OTP FOR {req.email}: {otp_code}")
+    return {"message": "Verification code sent to your email", "code": otp_code}
+
+@router.post("/verify-registration", response_model=Token)
+def verify_registration(req: VerifyRegistrationRequest, db: Session = Depends(get_db)):
+    """FLOW 1: Step 2 - Verify OTP and Create Account"""
+    otp_record = db.query(OTPVerification).filter(
+        OTPVerification.email == req.email,
+        OTPVerification.otp == req.otp,
+        OTPVerification.expires_at > datetime.utcnow(),
+        OTPVerification.verified == False
+    ).first()
+    
+    if not otp_record:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification code")
+    
+    otp_record.verified = True
+    
+    # Create the user
+    new_user = User(
+        name=req.registration_data.name,
+        username=req.registration_data.username,
+        email=req.registration_data.email,
+        hashed_password=hash_password(req.registration_data.password),
+        role=req.registration_data.role,
+        is_verified=True
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    access_token = create_access_token({"sub": new_user.username})
+    refresh_token = create_refresh_token({"sub": new_user.username})
+    
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "user": new_user,
+        "expires": "24h"
+    }
+
+@router.post("/refresh", response_model=Token)
+def refresh_token(refresh_token: str, db: Session = Depends(get_db)):
+    """FLOW 3: Token Refresh"""
+    try:
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+        username = payload.get("sub")
+        user = db.query(User).filter(User.username == username).first()
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        
+        new_access = create_access_token({"sub": username})
+        return {
+            "access_token": new_access,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+            "user": user
+        }
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
 
 @router.post("/google-login")
 def google_login(req: GoogleLoginRequest, db: Session = Depends(get_db)):
@@ -381,14 +473,37 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db
         user_id=user.id,
         ip_address=ip,
         user_agent=ua,
-        location=loc
+        location=loc,
+        status="active"
     )
     db.add(new_session)
     user.last_login = datetime.utcnow()
     db.commit()
 
     access_token = create_access_token({"sub": user.username})
-    return {"access_token": access_token, "token_type": "bearer", "user": user}
+    refresh_token = create_refresh_token({"sub": user.username})
+    
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "user": user,
+        "expires": "24h"
+    }
+
+@router.get("/active-sessions")
+def get_active_sessions(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """FLOW 5: Session Monitoring"""
+    if current_user.role != "Admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    return db.query(LoginSession).filter(LoginSession.status == "active").order_by(LoginSession.login_time.desc()).all()
+
+@router.post("/logout")
+def logout(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """End all active sessions for user"""
+    db.query(LoginSession).filter(LoginSession.user_id == current_user.id, LoginSession.status == "active").update({"status": "logged_out"})
+    db.commit()
+    return {"message": "Logged out successfully"}
 
 @router.get("/me", response_model=UserResponse)
 def read_me(current_user: User = Depends(get_current_user)):
