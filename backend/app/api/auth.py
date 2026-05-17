@@ -118,46 +118,67 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     return user
 
 import secrets
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import urllib.request
+import urllib.error
+import json as _json
 
 PLACEHOLDER_VALUES = {"your-email@gmail.com", "your-app-password", ""}
 
-def _check_smtp_config():
-    """Raise HTTP 503 immediately if SMTP is not properly configured."""
-    smtp_host = os.getenv("SMTP_HOST", "")
-    smtp_user = os.getenv("SMTP_USER", "")
-    smtp_pass = os.getenv("SMTP_PASSWORD", "")
+def _check_email_config():
+    """Raise HTTP 503 immediately if email is not properly configured."""
+    api_key = os.getenv("RESEND_API_KEY", "")
     mail_from = os.getenv("MAIL_FROM", "")
 
     missing = []
-    for name, val in [("SMTP_HOST", smtp_host), ("SMTP_USER", smtp_user), ("SMTP_PASSWORD", smtp_pass), ("MAIL_FROM", mail_from)]:
-        if not val or val in PLACEHOLDER_VALUES:
-            missing.append(name)
+    if not api_key or api_key in PLACEHOLDER_VALUES or api_key == "re_placeholder":
+        missing.append("RESEND_API_KEY")
+    if not mail_from or mail_from in PLACEHOLDER_VALUES:
+        missing.append("MAIL_FROM")
 
     if missing:
         raise HTTPException(
             status_code=503,
-            detail=f"SMTP misconfiguration: {', '.join(missing)} is missing or contains a placeholder value. "
-                   "Update your environment variables with real credentials and redeploy."
+            detail=f"Email misconfiguration: {', '.join(missing)} is missing or contains a placeholder value. "
+                   "Add RESEND_API_KEY and MAIL_FROM to your Render environment variables."
         )
+
+def _send_via_resend(to: str, subject: str, body: str):
+    """Send email using Resend HTTP API — works on all hosting platforms."""
+    _check_email_config()
+
+    api_key = os.getenv("RESEND_API_KEY")
+    mail_from = os.getenv("MAIL_FROM")
+
+    payload = _json.dumps({
+        "from": f"RetailPulse AI <{mail_from}>",
+        "to": [to],
+        "subject": subject,
+        "text": body
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        },
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            print(f"Email sent to {to} via Resend — status {resp.status}")
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="ignore")
+        raise HTTPException(status_code=503, detail=f"Failed to send email: {e.code} {err_body}")
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Failed to send email: {e}")
+
 
 def send_otp_email(email: str, otp: str, expiry_minutes: int = 10):
     """Send a verification OTP to the given email address."""
-    _check_smtp_config()
-
-    smtp_host = os.getenv("SMTP_HOST")
-    smtp_port = int(os.getenv("SMTP_PORT", 587))
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_pass = os.getenv("SMTP_PASSWORD")
-    mail_from = os.getenv("MAIL_FROM")
-
-    msg = MIMEMultipart("alternative")
-    msg["From"] = mail_from
-    msg["To"] = email
-    msg["Subject"] = "Your RetailPulse AI Verification Code"
-
+    subject = "Your RetailPulse AI Verification Code"
     body = (
         f"Hello,\n\n"
         f"Your verification code is:\n\n"
@@ -166,58 +187,21 @@ def send_otp_email(email: str, otp: str, expiry_minutes: int = 10):
         f"If you did not request this, please ignore this email.\n\n"
         f"— RetailPulse AI"
     )
-    msg.attach(MIMEText(body, "plain"))
-
-    try:
-        server = smtplib.SMTP(smtp_host, smtp_port)
-        server.starttls()
-        server.login(smtp_user, smtp_pass)
-        server.send_message(msg)
-        server.quit()
-        print(f"OTP email sent to {email}")
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Failed to send verification email: {e}")
+    _send_via_resend(email, subject, body)
 
 
 def send_reset_email(email: str, reset_link: str, expiry_minutes: int = 60):
     """Send a password reset link to the given email address."""
-    _check_smtp_config()
-
-    smtp_host = os.getenv("SMTP_HOST")
-    smtp_port = int(os.getenv("SMTP_PORT", 587))
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_pass = os.getenv("SMTP_PASSWORD")
-    mail_from = os.getenv("MAIL_FROM")
-
-    msg = MIMEMultipart("alternative")
-    msg["From"] = mail_from
-    msg["To"] = email
-    msg["Subject"] = "RetailPulse AI — Password Reset Request"
-
+    subject = "RetailPulse AI — Password Reset Request"
     body = (
         f"Hello,\n\n"
-        f"We received a request to reset your password. Click the link below to proceed:\n\n"
+        f"We received a request to reset your password. Click the link below:\n\n"
         f"    {reset_link}\n\n"
         f"This link expires in {expiry_minutes} minutes.\n\n"
-        f"If you did not request a password reset, please ignore this email.\n\n"
+        f"If you did not request this, please ignore this email.\n\n"
         f"— RetailPulse AI"
     )
-    msg.attach(MIMEText(body, "plain"))
-
-    try:
-        server = smtplib.SMTP(smtp_host, smtp_port)
-        server.starttls()
-        server.login(smtp_user, smtp_pass)
-        server.send_message(msg)
-        server.quit()
-        print(f"Password reset email sent to {email}")
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Failed to send reset email: {e}")
-
-
-import re
-import secrets
-from passlib.context import CryptContext
+    _send_via_resend(email, subject, body)
 
 # ─── Strong Password Logic ───────────────────────────────────────────────────
 def is_password_strong(password: str) -> bool:
@@ -280,7 +264,7 @@ def register_init(req: RegisterInitRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Username or email already registered")
     
     # Validate SMTP config before doing anything else
-    _check_smtp_config()
+    _check_email_config()
 
     # Invalidate any existing unexpired OTPs for this email
     db.query(OTPVerification).filter(
@@ -383,7 +367,7 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
         return {"message": "If the email exists, a reset link has been sent"}
     
     # Validate SMTP config before generating any token
-    _check_smtp_config()
+    _check_email_config()
 
     reset_token = secrets.token_urlsafe(32)
     expiry = datetime.utcnow() + timedelta(minutes=60)
@@ -546,7 +530,7 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db
     # Check for 2FA
     if user.two_factor_enabled:
         # Validate SMTP before generating OTP
-        _check_smtp_config()
+        _check_email_config()
 
         # Generate a real OTP and store it with expiry
         otp_code = str(secrets.randbelow(899999) + 100000)
