@@ -37,15 +37,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Initialize Prometheus Instrumentator
-Instrumentator().instrument(app).expose(app)
-
-@app.on_event("startup")
-async def startup_event():
-    # Start the live sales simulation in the background
-    asyncio.create_task(stream.generate_live_sales_stream())
-    logger.info("Application started and background tasks initialized")
-
+# CORS must be added before any other middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -54,6 +46,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Initialize Prometheus Instrumentator
+Instrumentator().instrument(app).expose(app)
+
+
+@app.on_event("startup")
+async def startup_event():
+    # Start the live sales simulation in the background
+    asyncio.create_task(stream.generate_live_sales_stream())
+    logger.info("Application started and background tasks initialized")
 
 @app.get("/health", tags=["Health"])
 async def health_check(db=Depends(get_db)):
