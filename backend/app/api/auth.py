@@ -166,12 +166,7 @@ def _send_via_smtp(to: str, subject: str, body: str):
         server.quit()
         print(f"Email sent to {to} via SMTP")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to send email via SMTP: {e}")       print(f"Email sent to {to} via Resend — status {resp.status}")
-    except urllib.error.HTTPError as e:
-        err_body = e.read().decode("utf-8", errors="ignore")
-        raise HTTPException(status_code=500, detail=f"Failed to send email: {e.code} {err_body}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to send email: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to send email via SMTP: {e}")
 
 
 def send_otp_email(email: str, otp: str, expiry_minutes: int = 10):
