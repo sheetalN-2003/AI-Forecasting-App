@@ -104,7 +104,10 @@ export const UserDashboard = () => {
   // WebSocket connection for real-time updates
   useEffect(() => {
     const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProto}//localhost:8000/ws/live-sales`;
+    const wsHost = import.meta.env.VITE_API_URL
+      ? import.meta.env.VITE_API_URL.replace(/^https?:\/\//, '')
+      : 'localhost:8000';
+    const wsUrl = `${wsProto}//${wsHost}/ws/live-sales`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
@@ -440,7 +443,7 @@ export const UserDashboard = () => {
             onClick={async () => {
               try {
                 const token = localStorage.getItem('retailpulse_token');
-                const res = await fetch('http://localhost:8000/analytics/export-pdf', {
+                const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/analytics/export-pdf`, {
                   headers: { Authorization: `Bearer ${token}` }
                 });
                 if (!res.ok) throw new Error('Export failed');

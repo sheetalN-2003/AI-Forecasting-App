@@ -65,7 +65,10 @@ export const Dashboard = ({ setActiveTab }) => {
   // Define WebSockets connection
   useEffect(() => {
     const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProto}//localhost:8000/ws/live-sales`;
+    const wsHost = import.meta.env.VITE_API_URL
+      ? import.meta.env.VITE_API_URL.replace(/^https?:\/\//, '')
+      : 'localhost:8000';
+    const wsUrl = `${wsProto}//${wsHost}/ws/live-sales`;
     const ws = new WebSocket(wsUrl);
 
     ws.onmessage = (event) => {
@@ -148,7 +151,7 @@ export const Dashboard = ({ setActiveTab }) => {
         <div className="flex items-center gap-3">
           <button
             onClick={() => {
-              window.open('http://localhost:8000/analytics/export-csv', '_blank');
+              window.open(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/analytics/export-csv`, '_blank');
             }}
             className="flex items-center gap-2 text-xs text-indigo-400 hover:text-indigo-300 px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 rounded-lg transition-all border border-indigo-500/20"
           >
