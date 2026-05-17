@@ -7,6 +7,7 @@ from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 import os
+import re
 
 from app.core.database import get_db
 from app.models.schemas import User
