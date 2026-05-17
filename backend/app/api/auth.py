@@ -137,7 +137,7 @@ def _check_email_config():
 
     if missing:
         raise HTTPException(
-            status_code=503,
+            status_code=500,
             detail=f"Email misconfiguration: {', '.join(missing)} is missing or contains a placeholder value. "
                    "Add RESEND_API_KEY and MAIL_FROM to your Render environment variables."
         )
@@ -171,9 +171,9 @@ def _send_via_resend(to: str, subject: str, body: str):
             print(f"Email sent to {to} via Resend — status {resp.status}")
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8", errors="ignore")
-        raise HTTPException(status_code=503, detail=f"Failed to send email: {e.code} {err_body}")
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {e.code} {err_body}")
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Failed to send email: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {e}")
 
 
 def send_otp_email(email: str, otp: str, expiry_minutes: int = 10):
