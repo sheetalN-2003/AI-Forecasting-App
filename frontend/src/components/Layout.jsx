@@ -306,7 +306,7 @@ export const Layout = ({ children, activeTab, setActiveTab }) => {
         </header>
 
         {/* Verification Banner */}
-        {user?.is_verified === 0 && (
+        {!user?.is_verified && (
           <div className="mx-8 mt-6 p-4 bg-indigo-600/10 border border-indigo-500/20 rounded-2xl flex items-center justify-between animate-in fade-in slide-in-from-top-4 duration-500">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-indigo-500/20 rounded-xl flex items-center justify-center">

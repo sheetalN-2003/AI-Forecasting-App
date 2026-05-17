@@ -5,7 +5,7 @@ import {
   Activity, Brain, BellRing, Sparkles, Download, 
   Settings, User, ShieldCheck, Zap, RefreshCw, 
   Search, ArrowRight, CheckCircle2, AlertTriangle,
-  LogOut, Clock, Globe, Wifi
+  LogOut, Clock, Globe, Wifi, Trash2
 } from 'lucide-react';
 import { 
   analyticsAPI, inventoryAPI, forecastingAPI, 
@@ -92,6 +92,9 @@ export const UserDashboard = () => {
   const [inventory, setInventory] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [autoInsights, setAutoInsights] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [forecastHistory, setForecastHistory] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [wsConnected, setWsConnected] = useState(false);
@@ -130,6 +133,9 @@ export const UserDashboard = () => {
           today_orders: prev.today_orders + 1,
         }) : prev);
         
+        // Update transactions log
+        setTransactions(prev => [msg.data, ...prev].slice(0, 50));
+        
         // Update chart data in real-time for current month
         setChartData(prev => {
           if (!prev || prev.length === 0) return prev;
@@ -152,18 +158,22 @@ export const UserDashboard = () => {
 
   const fetchData = async () => {
     try {
-      const [m, c, inv, n, insights] = await Promise.all([
+      const [m, c, inv, n, insights, tx, fh] = await Promise.all([
         analyticsAPI.getUserMetrics(),
         analyticsAPI.getRevenueByMonth(),
         inventoryAPI.getStatus(),
         notificationsAPI.get(),
-        insightsAPI.getAutoInsights().catch(() => ({ data: [] })) // Fallback if insights fail
+        insightsAPI.getAutoInsights().catch(() => ({ data: [] })), // Fallback if insights fail
+        analyticsAPI.getRecentTransactions(50).catch(() => ({ data: [] })),
+        forecastingAPI.getHistory().catch(() => ({ data: [] }))
       ]);
       setMetrics(m.data);
       setChartData(c.data);
       setInventory(inv.data);
       setNotifications(n.data);
       setAutoInsights(insights.data);
+      setTransactions(tx.data);
+      setForecastHistory(fh.data);
       setLastUpdated(new Date());
     } catch (err) {
       console.error("User Dashboard Error:", err);
@@ -188,6 +198,16 @@ export const UserDashboard = () => {
   const criticalInventory = inventory.filter(item => item.status === 'CRITICAL_LOW').length;
   const healthyInventory = inventory.filter(item => item.status === 'HEALTHY').length;
 
+  const categories = inventory && inventory.length > 0 
+    ? [...new Set(inventory.map(item => item.category))] 
+    : ['Electronics', 'Furniture', 'Clothing', 'Office Supplies'];
+
+  useEffect(() => {
+    if (categories.length > 0 && !categories.includes(forecastForm.category)) {
+      setForecastForm(prev => ({ ...prev, category: categories[0] }));
+    }
+  }, [inventory]);
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       
@@ -203,6 +223,70 @@ export const UserDashboard = () => {
 
       {/* 2. Live Sales Graph */}
       <LiveSalesGraph data={chartData} />
+
+      {/* 2.5 Historical Sales Log Explorer */}
+      <div className="glass p-8 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+              <Clock size={20} className="text-indigo-400" /> Historical Sales Log
+            </h3>
+            <p className="text-xs text-slate-500 font-medium">Browse, search, and audit all transaction records (including uploaded datasets)</p>
+          </div>
+          <div className="relative max-w-sm w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+            <input 
+              type="text" 
+              placeholder="Search by Category or Region..." 
+              value={searchTerm} 
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full bg-slate-900/50 border border-white/5 focus:border-indigo-500/40 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-200 outline-none transition-all placeholder:text-slate-600"
+            />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto border border-white/5 rounded-2xl bg-slate-950/20">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-white/5 bg-slate-900/40 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                <th className="py-4 px-6">Order Date</th>
+                <th className="py-4 px-6">Category</th>
+                <th className="py-4 px-6">Region</th>
+                <th className="py-4 px-6 text-right">Quantity</th>
+                <th className="py-4 px-6 text-right">Revenue</th>
+                <th className="py-4 px-6 text-right">Profit</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5 text-xs text-slate-300">
+              {transactions
+                .filter(tx => 
+                  tx.category.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                  tx.region.toLowerCase().includes(searchTerm.toLowerCase())
+                )
+                .slice(0, 10)
+                .map((tx, idx) => (
+                  <tr key={tx.id || idx} className="hover:bg-white/5 transition-colors">
+                    <td className="py-4 px-6 font-semibold text-slate-400">
+                      {tx.order_date ? tx.order_date.split('T')[0] : ''}
+                    </td>
+                    <td className="py-4 px-6 font-bold text-white uppercase tracking-tight">{tx.category}</td>
+                    <td className="py-4 px-6 text-slate-400 font-semibold">{tx.region}</td>
+                    <td className="py-4 px-6 text-right font-black text-slate-200">{tx.quantity}</td>
+                    <td className="py-4 px-6 text-right font-bold text-indigo-400">${tx.sales.toLocaleString()}</td>
+                    <td className="py-4 px-6 text-right font-bold text-emerald-400">${tx.profit.toLocaleString()}</td>
+                  </tr>
+                ))}
+              {transactions.length === 0 && (
+                <tr>
+                  <td colSpan="6" className="py-8 text-center text-slate-500 font-medium uppercase tracking-widest text-[10px]">
+                    No transactions found. Upload training data in settings to seed records.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* 3. AI Sales Forecasting */}
@@ -225,10 +309,9 @@ export const UserDashboard = () => {
                   onChange={e => setForecastForm({...forecastForm, category: e.target.value})}
                   className="input-field"
                 >
-                  <option>Electronics</option>
-                  <option>Furniture</option>
-                  <option>Clothing</option>
-                  <option>Groceries</option>
+                  {categories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
                 </select>
               </div>
               <div className="space-y-1">
@@ -253,6 +336,8 @@ export const UserDashboard = () => {
                     month: new Date().getMonth() + 1 
                   });
                   setPrediction(data);
+                  const fh = await forecastingAPI.getHistory().catch(() => ({ data: [] }));
+                  setForecastHistory(fh.data);
                 } catch (err) {
                   alert("Forecasting Engine error");
                 } finally {
@@ -364,18 +449,18 @@ export const UserDashboard = () => {
         </div>
       </div>
 
-      {/* 8. Explainable AI Section */}
-      <div className="glass p-8">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="p-3 bg-blue-500/10 rounded-2xl text-blue-400">
-            <ShieldCheck size={24} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* 8. Explainable AI Section */}
+        <div className="glass p-8 space-y-6">
+          <div className="flex items-center gap-3 mb-8">
+            <div className="p-3 bg-blue-500/10 rounded-2xl text-blue-400">
+              <ShieldCheck size={24} />
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-white tracking-tight">Forecast Transparency</h3>
+              <p className="text-xs text-slate-500 font-medium">Understanding AI decision metrics</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-xl font-black text-white tracking-tight">Forecast Transparency</h3>
-            <p className="text-xs text-slate-500 font-medium">Understanding AI decision metrics</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
           <div className="space-y-4">
             <div className="space-y-1">
               <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase">
@@ -405,10 +490,65 @@ export const UserDashboard = () => {
               </div>
             </div>
           </div>
-          <div className="p-6 bg-slate-800/40 rounded-2xl border border-white/5">
+          <div className="p-6 bg-slate-800/40 rounded-2xl border border-white/5 mt-6">
             <p className="text-xs text-slate-400 font-medium italic leading-relaxed">
               "Our XAI engine identifies that **Quantity** and **Historical Seasonality** are the primary drivers for today's high sales projection. Local events in the East region contributed a 5% variance."
             </p>
+          </div>
+        </div>
+
+        {/* 8.5 Past Forecasts History Feed */}
+        <div className="glass p-8 space-y-6">
+          <div className="flex items-center gap-3 mb-8">
+            <div className="p-3 bg-fuchsia-500/10 rounded-2xl text-fuchsia-400">
+              <Brain size={24} />
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-white tracking-tight">Forecast History</h3>
+              <p className="text-xs text-slate-500 font-medium">Audit logs of past predictions</p>
+            </div>
+          </div>
+          <div className="space-y-3 max-h-[300px] overflow-y-auto scrollbar-none pr-1">
+            {forecastHistory.map(h => (
+              <div key={h.id} className="p-4 bg-slate-800/40 rounded-xl border border-white/5 flex items-center justify-between group hover:bg-slate-800 transition-colors">
+                <div className="flex items-center gap-4">
+                  <div className="text-left">
+                    <p className="text-xs font-black text-white uppercase tracking-tight">
+                      {h.inputs?.category} (Qty: {h.inputs?.quantity})
+                    </p>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase">
+                      {new Date(h.date).toLocaleDateString()} • {h.model || 'RF/XGB Hybrid'}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right flex items-center gap-4">
+                  <div>
+                    <p className="text-sm font-black text-indigo-400">${h.prediction?.toLocaleString()}</p>
+                    <p className="text-[10px] text-emerald-400 font-bold">{(h.confidence * 100).toFixed(1)}% Conf</p>
+                  </div>
+                  <button 
+                    onClick={async () => {
+                      if (!confirm("Are you sure you want to delete this forecast log?")) return;
+                      try {
+                        await forecastingAPI.deleteHistory(h.id);
+                        setForecastHistory(prev => prev.filter(item => item.id !== h.id));
+                      } catch (err) {
+                        alert("Failed to delete forecast history log");
+                      }
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-1.5 bg-red-500/5 hover:bg-red-500 hover:text-white rounded-lg text-red-400 border border-red-500/10 transition-all"
+                    title="Delete Record"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              </div>
+            ))}
+            {forecastHistory.length === 0 && (
+              <div className="text-center py-8 text-slate-500 text-xs font-bold uppercase tracking-widest">
+                No past predictions found.
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -421,19 +561,30 @@ export const UserDashboard = () => {
           </div>
           <div>
             <h4 className="text-lg font-black text-white">Daily Performance Report</h4>
-            <p className="text-xs text-slate-500">Auto-generated summary for May 12, 2026</p>
+            <p className="text-xs text-slate-500">
+              Auto-generated summary for {metrics.active_date ? new Date(metrics.active_date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : new Date().toLocaleDateString()}
+            </p>
           </div>
         </div>
         <div className="flex gap-4 w-full md:w-auto">
           <button 
-            onClick={() => {
-              const content = "Date,Revenue,Orders,Growth\n2026-05-12,45000,124,14%";
-              const blob = new Blob([content], { type: 'text/csv' });
-              const url = window.URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `RetailPulse_Report_${new Date().toISOString().slice(0,10)}.csv`;
-              a.click();
+            onClick={async () => {
+              try {
+                const token = localStorage.getItem('retailpulse_token');
+                const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/analytics/export-csv`, {
+                  headers: { Authorization: `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Export failed');
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `RetailPulse_Report_${metrics.active_date || new Date().toISOString().slice(0,10)}.csv`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+              } catch (err) {
+                alert('CSV export failed. Please try again.');
+              }
             }}
             className="flex-1 md:flex-none px-6 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
           >
@@ -451,7 +602,7 @@ export const UserDashboard = () => {
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `RetailPulse_Report_${new Date().toISOString().slice(0,10)}.pdf`;
+                a.download = `RetailPulse_Report_${metrics.active_date || new Date().toISOString().slice(0,10)}.pdf`;
                 a.click();
                 window.URL.revokeObjectURL(url);
               } catch (err) {

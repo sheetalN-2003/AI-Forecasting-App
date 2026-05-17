@@ -188,24 +188,43 @@ async def get_automated_insights(db: Session = Depends(get_db)):
 
 @router.get("/user-metrics")
 async def get_user_metrics(db: Session = Depends(get_db)):
-    """Today's stats and user-level summary."""
+    """Today's stats and user-level summary with graceful fallback to most recent active day."""
     from datetime import datetime, date
     today = date.today()
     
+    # Attempt to query calendar today's stats
     today_stats = db.query(
         func.sum(SaleRecord.sales).label("revenue"),
         func.count(SaleRecord.id).label("orders")
     ).filter(func.date(SaleRecord.order_date) == today).first()
     
+    active_date = today
+    
+    # Fallback: if no records today, query the most recent transaction date in the entire DB
+    if not today_stats or today_stats.orders == 0 or today_stats.revenue is None:
+        latest_record = db.query(SaleRecord).order_by(SaleRecord.order_date.desc()).first()
+        if latest_record:
+            # SQLite stores dates as strings or Datetime objects. Extract the date component.
+            if isinstance(latest_record.order_date, str):
+                active_date = datetime.strptime(latest_record.order_date.split()[0], "%Y-%m-%d").date()
+            else:
+                active_date = latest_record.order_date.date()
+                
+            today_stats = db.query(
+                func.sum(SaleRecord.sales).label("revenue"),
+                func.count(SaleRecord.id).label("orders")
+            ).filter(func.date(SaleRecord.order_date) == active_date).first()
+
     total_rev = db.query(func.sum(SaleRecord.sales)).scalar() or 0
     
     return {
         "today_revenue": round(today_stats.revenue or 0, 2),
         "today_orders": today_stats.orders or 0,
-        "predicted_sales": round(total_rev * 0.05, 2), # Mock prediction for today
+        "predicted_sales": round(total_rev * 0.05, 2), # Mock prediction for active period
         "inventory_status": "Stable",
         "top_product": "UltraHD Monitor",
-        "monthly_growth": 8.5
+        "monthly_growth": 8.5,
+        "active_date": active_date.strftime("%Y-%m-%d")
     }
 
 @router.get("/export-csv")

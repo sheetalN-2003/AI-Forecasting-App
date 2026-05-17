@@ -286,6 +286,65 @@ def register_init(req: RegisterInitRequest, db: Session = Depends(get_db)):
             "code": otp_code
         }
 
+def notify_admin_of_new_user(new_user, db: Session):
+    """Notify the Admin (sheetaln9741@gmail.com) of a new user registration via email and WebSockets."""
+    # 1. Send Email Notification to Admin
+    admin_email = "sheetaln9741@gmail.com"
+    subject = f"RetailPulse AI — New Registration Pending Verification: {new_user.username}"
+    body = (
+        f"Hello Admin,\n\n"
+        f"A new user has registered on the RetailPulse AI platform and is pending verification:\n\n"
+        f"  Name: {new_user.name}\n"
+        f"  Username: {new_user.username}\n"
+        f"  Email: {new_user.email}\n"
+        f"  Role: {new_user.role}\n\n"
+        f"Please log into the Admin Dashboard to review and verify their clearance status in real-time.\n\n"
+        f"— RetailPulse AI Security System"
+    )
+    
+    import threading
+    def send_email():
+        try:
+            _send_via_smtp(admin_email, subject, body)
+        except Exception as e:
+            print(f"⚠️ [SMTP NOTIFY FAIL] Could not email new user registration to {admin_email}: {e}")
+            
+    threading.Thread(target=send_email, daemon=True).start()
+
+    # 2. Broadcast WebSocket Event to Admin Dashboard in Real-Time
+    try:
+        from app.api.stream import manager
+        import json
+        import asyncio
+        
+        event = {
+            "type": "NEW_USER_REGISTERED",
+            "data": {
+                "id": new_user.id,
+                "username": new_user.username,
+                "email": new_user.email,
+                "role": new_user.role,
+                "department": getattr(new_user, 'department', 'Enterprise') or 'Enterprise',
+                "organization": getattr(new_user, 'organization', 'RetailPulse') or 'RetailPulse',
+                "last_active": "Just now",
+                "status": "Inactive",
+                "is_verified": False
+            }
+        }
+        
+        # Fire-and-forget async broadcast
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(manager.broadcast(json.dumps(event)))
+            else:
+                loop.run_until_complete(manager.broadcast(json.dumps(event)))
+        except Exception:
+            asyncio.run(manager.broadcast(json.dumps(event)))
+    except Exception as e:
+        print(f"Failed to broadcast registration event: {e}")
+
+
 @router.post("/verify-registration", response_model=Token)
 def verify_registration(req: VerifyRegistrationRequest, db: Session = Depends(get_db)):
     """FLOW 1: Step 2 - Verify OTP and Create Account"""
@@ -308,11 +367,14 @@ def verify_registration(req: VerifyRegistrationRequest, db: Session = Depends(ge
         email=req.registration_data.email,
         hashed_password=hash_password(req.registration_data.password),
         role=req.registration_data.role,
-        is_verified=True
+        is_verified=False  # Must be verified by Admin sheetaln9741@gmail.com
     )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    
+    # Trigger real-time notifications to the Admin
+    notify_admin_of_new_user(new_user, db)
     
     access_token = create_access_token({"sub": new_user.username})
     refresh_token = create_refresh_token({"sub": new_user.username})
@@ -501,7 +563,7 @@ def get_login_sessions(db: Session = Depends(get_db), current_user: User = Depen
 
 @router.post("/login", response_model=Token)
 def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == form_data.username).first()
+    user = db.query(User).filter((User.username == form_data.username) | (User.email == form_data.username)).first()
     
     # Security Event System: Track Failed Logins
     if not user or not verify_password(form_data.password, user.hashed_password):

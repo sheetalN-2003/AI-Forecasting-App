@@ -286,9 +286,26 @@ const UserManagement = ({ data, onAction }) => (
                 </div>
               </td>
               <td className="px-8 py-5 text-right">
-                <button onClick={() => onAction(user.id, 'delete')} className="p-2.5 bg-red-500/5 hover:bg-red-500 hover:text-white border border-red-500/10 rounded-xl text-red-400 transition-all">
-                  <Trash2 size={14} />
-                </button>
+                <div className="flex justify-end gap-2">
+                  <button 
+                    onClick={() => onAction(user.id, 'verify')} 
+                    title={user.is_verified ? "Revoke Verification" : "Verify Identity"}
+                    className={`p-2.5 border rounded-xl transition-all ${
+                      user.is_verified 
+                        ? 'bg-emerald-500/10 hover:bg-emerald-500 hover:text-white border-emerald-500/20 text-emerald-400' 
+                        : 'bg-indigo-500/10 hover:bg-indigo-500 hover:text-white border-indigo-500/20 text-indigo-400'
+                    }`}
+                  >
+                    <UserCheck size={14} />
+                  </button>
+                  <button 
+                    onClick={() => onAction(user.id, 'delete')} 
+                    title="Delete User"
+                    className="p-2.5 bg-red-500/5 hover:bg-red-500 hover:text-white border border-red-500/10 rounded-xl text-red-400 transition-all"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </td>
             </tr>
           ))}
@@ -757,6 +774,24 @@ export const AdminDashboard = () => {
               ...prev.overview,
               total_revenue: prev.overview.total_revenue + msg.data.sales,
               live_transactions: prev.overview.live_transactions + 1
+            }
+          };
+        });
+      } else if (msg.type === 'NEW_USER_REGISTERED') {
+        setData(prev => {
+          if (!prev) return prev;
+          // Prevent duplicates
+          if (prev.users.list.some(u => u.id === msg.data.id)) return prev;
+          return {
+            ...prev,
+            overview: {
+              ...prev.overview,
+              total_users: prev.overview.total_users + 1
+            },
+            users: {
+              ...prev.users,
+              total: prev.users.total + 1,
+              list: [msg.data, ...prev.users.list]
             }
           };
         });

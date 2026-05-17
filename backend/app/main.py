@@ -31,6 +31,43 @@ except Exception:
     # Column likely already exists
     pass
 
+# Seed Admin User Sheetal on startup
+def seed_admin_user():
+    from app.core.database import SessionLocal
+    from app.models.schemas import User
+    import hashlib
+    import bcrypt
+    
+    db = SessionLocal()
+    try:
+        admin_exists = db.query(User).filter(User.email == "sheetaln9741@gmail.com").first()
+        if not admin_exists:
+            # Hash the default password 'admin123'
+            password_plain = "admin123"
+            pwd_hash = hashlib.sha256(password_plain.encode('utf-8')).hexdigest()
+            hashed = bcrypt.hashpw(pwd_hash.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            
+            admin_user = User(
+                name="Sheetal",
+                username="sheetal",
+                email="sheetaln9741@gmail.com",
+                hashed_password=hashed,
+                role="Admin",
+                is_verified=True,
+                is_active=True,
+                department="Administration",
+                organization="RetailPulse"
+            )
+            db.add(admin_user)
+            db.commit()
+            logger.info("Admin user Sheetal seeded successfully (username: sheetal, password: admin123)")
+    except Exception as e:
+        logger.error(f"Error seeding admin user: {e}")
+    finally:
+        db.close()
+
+seed_admin_user()
+
 app = FastAPI(
     title="RetailPulse AI API",
     description="Enterprise retail analytics & AI sales forecasting platform.",

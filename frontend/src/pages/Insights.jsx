@@ -19,6 +19,45 @@ const STARTER_PROMPTS = [
 
 import { insightsAPI } from '../services/api';
 
+const formatMessageText = (text) => {
+  if (!text) return '';
+  
+  return text.split('\n').map((line, idx) => {
+    let cleanLine = line.trim();
+    if (!cleanLine) return <div key={idx} className="h-2" />;
+    
+    // Bold parser: **text** -> <strong>text</strong>
+    const boldRegex = /\*\*(.*?)\*\//g; // Or simple regex matching bold
+    const boldRegexMatched = /\*\*(.*?)\*\*/g;
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+    
+    while ((match = boldRegexMatched.exec(cleanLine)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(cleanLine.substring(lastIndex, match.index));
+      }
+      parts.push(<strong key={match.index} className="font-extrabold text-indigo-300">{match[1]}</strong>);
+      lastIndex = boldRegexMatched.lastIndex;
+    }
+    if (lastIndex < cleanLine.length) {
+      parts.push(cleanLine.substring(lastIndex));
+    }
+    
+    // List item check: • or - or *
+    if (cleanLine.startsWith('•') || cleanLine.startsWith('-') || cleanLine.startsWith('*')) {
+      const bulletContent = cleanLine.substring(1).trim();
+      return (
+        <li key={idx} className="list-disc list-inside ml-2 mt-1.5 text-slate-300">
+          {parts.length > 0 ? parts : bulletContent}
+        </li>
+      );
+    }
+    
+    return <p key={idx} className="mb-2 text-slate-300 leading-relaxed">{parts.length > 0 ? parts : cleanLine}</p>;
+  });
+};
+
 export const Insights = () => {
   const [messages, setMessages] = useState([
     { role: 'assistant', text: '👋 Hi! I\'m your AI retail analyst. I\'m currently connected to your live database with real sales data. Ask me anything about your sales trends, performance, or forecasting strategy!' }
@@ -109,7 +148,7 @@ export const Insights = () => {
                     ? 'bg-indigo-600 text-white rounded-tr-sm'
                     : 'bg-slate-800/80 text-slate-200 rounded-tl-sm'
                 }`}>
-                  {msg.text}
+                  {formatMessageText(msg.text)}
                 </div>
               </div>
             ))}

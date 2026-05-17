@@ -94,6 +94,83 @@ def get_db_context(db: Session):
         "categories": [{"name": c.category, "sales": c.total_sales, "profit": c.total_profit, "margin": (c.total_profit/c.total_sales*100) if c.total_sales > 0 else 0} for c in category_stats[:5]]
     }
 
+def call_gemini_api(api_key: str, prompt: str) -> str:
+    """Connect to Gemini 2.0 via direct REST APIs, Google GenAI SDK, or legacy GenerativeAI SDK."""
+    # Method 1: Try using standard requests
+    try:
+        import requests
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": prompt}
+                    ]
+                }
+            ]
+        }
+        res = requests.post(url, json=payload, headers=headers, timeout=15)
+        if res.status_code == 200:
+            data = res.json()
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        else:
+            print(f"Direct HTTP Gemini API error (status {res.status_code}): {res.text}")
+    except Exception as e:
+        print(f"Direct HTTP requests call failed: {e}")
+
+    # Method 2: Try using standard urllib (absolutely zero external dependencies)
+    try:
+        import urllib.request
+        import json
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": prompt}
+                    ]
+                }
+            ]
+        }
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            url, 
+            data=data, 
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=15) as response:
+            res_data = json.loads(response.read().decode("utf-8"))
+            return res_data["candidates"][0]["content"]["parts"][0]["text"]
+    except Exception as e:
+        print(f"Direct HTTP urllib call failed: {e}")
+
+    # Method 3: Try Google GenAI SDK (google-genai)
+    try:
+        from google import genai as google_genai
+        if google_genai:
+            client = google_genai.Client(api_key=api_key)
+            response = client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=prompt
+            )
+            return response.text
+    except Exception as e:
+        print(f"Google GenAI SDK call failed: {e}")
+
+    # Method 4: Try legacy google-generativeai SDK
+    try:
+        import google.generativeai as legacy_genai
+        legacy_genai.configure(api_key=api_key)
+        model = legacy_genai.GenerativeModel('gemini-2.0-flash')
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        print(f"Legacy Google GenerativeAI SDK call failed: {e}")
+
+    raise RuntimeError("All Gemini API connection methods failed.")
+
 @router.post("/chat")
 async def chat_insights(req: ChatRequest, db: Session = Depends(get_db)):
     msg = req.message
@@ -101,10 +178,8 @@ async def chat_insights(req: ChatRequest, db: Session = Depends(get_db)):
     
     api_key = os.getenv("GEMINI_API_KEY")
     
-    if api_key and google_genai:
+    if api_key:
         try:
-            client = google_genai.Client(api_key=api_key)
-            
             categories_summary = ", ".join([f"{c['name']}: ${c['sales']:,.0f} (margin: {c['margin']:.1f}%)" for c in ctx['categories']])
             
             prompt = f"""
@@ -127,16 +202,12 @@ async def chat_insights(req: ChatRequest, db: Session = Depends(get_db)):
             
             User Question: "{msg}"
             
-            Provide a professional, data-driven response. Use specific numbers from the data. Be concise but insightful.
+            Provide a professional, data-driven response. Use specific numbers from the data. Be concise but insightful. Format your response beautifully in markdown with bullet points and bolding.
             """
-            response = client.models.generate_content(
-                model='gemini-2.0-flash',
-                contents=prompt
-            )
-            return {"response": response.text}
+            response_text = call_gemini_api(api_key, prompt)
+            return {"response": response_text}
         except Exception as e:
-            print(f"Gemini Error: {e}")
-            # Fallback to heuristic below
+            print(f"Gemini Error (falling back): {e}")
 
     # Enhanced Intelligent Heuristic Fallback
     msg_low = msg.lower()
