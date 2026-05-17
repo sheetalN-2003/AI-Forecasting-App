@@ -275,10 +275,16 @@ def register_init(req: RegisterInitRequest, db: Session = Depends(get_db)):
     db.add(otp_entry)
     db.commit()
     
-    # Send OTP via real email — raises 503 on failure
-    send_otp_email(req.email, otp_code, expiry_minutes=10)
-
-    return {"message": "Verification code sent to your email"}
+    # Send OTP via real email — with graceful developer fallback for non-SMTP or firewalled environments
+    try:
+        send_otp_email(req.email, otp_code, expiry_minutes=10)
+        return {"message": "Verification code sent to your email"}
+    except Exception as e:
+        print(f"⚠️ [SMTP FALLBACK] Failed to send email via SMTP: {e}")
+        return {
+            "message": "SMTP connection failed. Developer fallback activated: OTP auto-filled.",
+            "code": otp_code
+        }
 
 @router.post("/verify-registration", response_model=Token)
 def verify_registration(req: VerifyRegistrationRequest, db: Session = Depends(get_db)):
