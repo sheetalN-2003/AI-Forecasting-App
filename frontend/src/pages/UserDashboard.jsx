@@ -188,16 +188,6 @@ export const UserDashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
-  if (loading || !metrics) return (
-    <div className="flex flex-col items-center justify-center h-[60vh] space-y-4">
-      <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-      <p className="text-slate-500 font-black uppercase tracking-widest text-xs animate-pulse">Loading Store Manager Workspace...</p>
-    </div>
-  );
-
-  const criticalInventory = inventory.filter(item => item.status === 'CRITICAL_LOW').length;
-  const healthyInventory = inventory.filter(item => item.status === 'HEALTHY').length;
-
   const categories = inventory && inventory.length > 0 
     ? [...new Set(inventory.map(item => item.category))] 
     : ['Electronics', 'Furniture', 'Clothing', 'Office Supplies'];
@@ -207,6 +197,16 @@ export const UserDashboard = () => {
       setForecastForm(prev => ({ ...prev, category: categories[0] }));
     }
   }, [inventory]);
+
+  if (loading || !metrics) return (
+    <div className="flex flex-col items-center justify-center h-[60vh] space-y-4">
+      <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+      <p className="text-slate-500 font-black uppercase tracking-widest text-xs animate-pulse">Loading Store Manager Workspace...</p>
+    </div>
+  );
+
+  const criticalInventory = inventory.filter(item => item.status === 'CRITICAL_LOW').length;
+  const healthyInventory = inventory.filter(item => item.status === 'HEALTHY').length;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
