@@ -118,57 +118,55 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     return user
 
 import secrets
-import urllib.request
-import urllib.error
-import json as _json
-
-PLACEHOLDER_VALUES = {"your-email@gmail.com", "your-app-password", ""}
+import smtplib
+from email.mime.text import MIMEText
 
 def _check_email_config():
-    """Raise HTTP 503 immediately if email is not properly configured."""
-    api_key = os.getenv("RESEND_API_KEY", "")
+    """Raise HTTP 500 immediately if email is not properly configured."""
+    host = os.getenv("SMTP_HOST", "")
+    port = os.getenv("SMTP_PORT", "")
+    user = os.getenv("SMTP_USER", "")
+    password = os.getenv("SMTP_PASSWORD", "")
     mail_from = os.getenv("MAIL_FROM", "")
 
     missing = []
-    if not api_key or api_key in PLACEHOLDER_VALUES or api_key == "re_placeholder":
-        missing.append("RESEND_API_KEY")
-    if not mail_from or mail_from in PLACEHOLDER_VALUES:
-        missing.append("MAIL_FROM")
+    if not host: missing.append("SMTP_HOST")
+    if not port: missing.append("SMTP_PORT")
+    if not user: missing.append("SMTP_USER")
+    if not password: missing.append("SMTP_PASSWORD")
+    if not mail_from: missing.append("MAIL_FROM")
 
     if missing:
         raise HTTPException(
             status_code=500,
-            detail=f"Email misconfiguration: {', '.join(missing)} is missing or contains a placeholder value. "
-                   "Add RESEND_API_KEY and MAIL_FROM to your Render environment variables."
+            detail=f"Email misconfiguration: {', '.join(missing)} is missing. "
+                   "Add these to your environment variables."
         )
 
-def _send_via_resend(to: str, subject: str, body: str):
-    """Send email using Resend HTTP API — works on all hosting platforms."""
+def _send_via_smtp(to: str, subject: str, body: str):
+    """Send email using standard SMTP."""
     _check_email_config()
 
-    api_key = os.getenv("RESEND_API_KEY")
+    host = os.getenv("SMTP_HOST")
+    port = int(os.getenv("SMTP_PORT", 587))
+    user = os.getenv("SMTP_USER")
+    password = os.getenv("SMTP_PASSWORD")
     mail_from = os.getenv("MAIL_FROM")
 
-    payload = _json.dumps({
-        "from": f"RetailPulse AI <{mail_from}>",
-        "to": [to],
-        "subject": subject,
-        "text": body
-    }).encode("utf-8")
-
-    req = urllib.request.Request(
-        "https://api.resend.com/emails",
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        },
-        method="POST"
-    )
+    msg = MIMEText(body)
+    msg['Subject'] = subject
+    msg['From'] = f"RetailPulse AI <{mail_from}>"
+    msg['To'] = to
 
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            print(f"Email sent to {to} via Resend — status {resp.status}")
+        server = smtplib.SMTP(host, port, timeout=15)
+        server.starttls()
+        server.login(user, password)
+        server.send_message(msg)
+        server.quit()
+        print(f"Email sent to {to} via SMTP")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send email via SMTP: {e}")       print(f"Email sent to {to} via Resend — status {resp.status}")
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8", errors="ignore")
         raise HTTPException(status_code=500, detail=f"Failed to send email: {e.code} {err_body}")
@@ -187,7 +185,7 @@ def send_otp_email(email: str, otp: str, expiry_minutes: int = 10):
         f"If you did not request this, please ignore this email.\n\n"
         f"— RetailPulse AI"
     )
-    _send_via_resend(email, subject, body)
+    _send_via_smtp(email, subject, body)
 
 
 def send_reset_email(email: str, reset_link: str, expiry_minutes: int = 60):
@@ -201,7 +199,7 @@ def send_reset_email(email: str, reset_link: str, expiry_minutes: int = 60):
         f"If you did not request this, please ignore this email.\n\n"
         f"— RetailPulse AI"
     )
-    _send_via_resend(email, subject, body)
+    _send_via_smtp(email, subject, body)
 
 # ─── Strong Password Logic ───────────────────────────────────────────────────
 def is_password_strong(password: str) -> bool:
