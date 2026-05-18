@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
-import { notificationsAPI } from '../services/api';
+import { notificationsAPI, authAPI } from '../services/api';
 import { CommandCenter } from './CommandCenter';
 
 const NAV_ITEMS = [
@@ -76,8 +76,11 @@ export const Layout = ({ children, activeTab, setActiveTab }) => {
     } catch (err) {}
   };
 
-  const dismissNotification = (id) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+  const dismissNotification = async (id) => {
+    try {
+      await notificationsAPI.delete(id);
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    } catch (err) {}
   };
 
   useEffect(() => {
@@ -107,6 +110,24 @@ export const Layout = ({ children, activeTab, setActiveTab }) => {
       socket.close();
     };
   }, [fetchNotifications]);
+
+  useEffect(() => {
+    if (!user || user.is_verified) return;
+    
+    const checkVerification = async () => {
+      try {
+        const { data } = await authAPI.me();
+        if (data.is_verified && !user.is_verified) {
+          const updatedUser = { ...user, is_verified: true };
+          localStorage.setItem('retailpulse_user', JSON.stringify(updatedUser));
+          window.location.reload();
+        }
+      } catch (err) {}
+    };
+
+    const interval = setInterval(checkVerification, 5000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   const unreadCount = notifications.filter(n => n.is_read === 0).length;
 
@@ -275,7 +296,18 @@ export const Layout = ({ children, activeTab, setActiveTab }) => {
                       </div>
                     ) : (
                       notifications.map(n => (
-                        <div key={n.id} className={`p-4 hover:bg-white/5 transition-colors group relative ${n.is_read ? 'opacity-50' : ''}`}>
+                        <div 
+                          key={n.id} 
+                          onClick={async () => {
+                            if (n.is_read === 0) {
+                              try {
+                                await notificationsAPI.markAsRead(n.id);
+                                setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, is_read: 1 } : item));
+                              } catch (err) {}
+                            }
+                          }}
+                          className={`p-4 hover:bg-white/5 cursor-pointer transition-colors group relative ${n.is_read ? 'opacity-50' : ''}`}
+                        >
                           <div className="flex items-start gap-3">
                             <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${n.is_read ? 'bg-slate-700' : n.type === 'alert' ? 'bg-red-400 animate-pulse' : 'bg-indigo-400 animate-pulse'}`} />
                             <div className="flex-1 min-w-0">
@@ -284,7 +316,10 @@ export const Layout = ({ children, activeTab, setActiveTab }) => {
                               <p className="text-[10px] text-slate-600 mt-1">{new Date(n.created_at).toLocaleTimeString()}</p>
                             </div>
                             <button
-                              onClick={() => dismissNotification(n.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                dismissNotification(n.id);
+                              }}
                               className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-white transition-all flex-shrink-0 mt-0.5"
                             >
                               <X size={12} />
@@ -306,7 +341,7 @@ export const Layout = ({ children, activeTab, setActiveTab }) => {
         </header>
 
         {/* Verification Banner */}
-        {!user?.is_verified && (
+        {!user?.is_verified && user?.role !== 'Admin' && (
           <div className="mx-8 mt-6 p-4 bg-indigo-600/10 border border-indigo-500/20 rounded-2xl flex items-center justify-between animate-in fade-in slide-in-from-top-4 duration-500">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-indigo-500/20 rounded-xl flex items-center justify-center">

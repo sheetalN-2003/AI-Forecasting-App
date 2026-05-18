@@ -95,81 +95,90 @@ def get_db_context(db: Session):
     }
 
 def call_gemini_api(api_key: str, prompt: str) -> str:
-    """Connect to Gemini 2.0 via direct REST APIs, Google GenAI SDK, or legacy GenerativeAI SDK."""
-    # Method 1: Try using standard requests
-    try:
-        import requests
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
-        headers = {"Content-Type": "application/json"}
-        payload = {
-            "contents": [
-                {
-                    "parts": [
-                        {"text": prompt}
-                    ]
-                }
-            ]
-        }
-        res = requests.post(url, json=payload, headers=headers, timeout=15)
-        if res.status_code == 200:
-            data = res.json()
-            return data["candidates"][0]["content"]["parts"][0]["text"]
-        else:
-            print(f"Direct HTTP Gemini API error (status {res.status_code}): {res.text}")
-    except Exception as e:
-        print(f"Direct HTTP requests call failed: {e}")
+    """Connect to Gemini API with robust model fallbacks (2.0-flash, 1.5-flash, 1.5-pro, 1.0-pro) across direct REST requests, urllib, and legacy SDKs."""
+    models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"]
+    
+    # Method 1: Try using standard requests (HTTP POST) iterating models
+    import requests
+    for model_name in models:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+            headers = {"Content-Type": "application/json"}
+            payload = {
+                "contents": [
+                    {
+                        "parts": [
+                            {"text": prompt}
+                        ]
+                    }
+                ]
+            }
+            res = requests.post(url, json=payload, headers=headers, timeout=12)
+            if res.status_code == 200:
+                data = res.json()
+                return data["candidates"][0]["content"]["parts"][0]["text"]
+            else:
+                print(f"Gemini HTTP requests model {model_name} error (status {res.status_code}): {res.text}")
+        except Exception as e:
+            print(f"Gemini HTTP requests model {model_name} call failed: {e}")
 
     # Method 2: Try using standard urllib (absolutely zero external dependencies)
-    try:
-        import urllib.request
-        import json
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
-        payload = {
-            "contents": [
-                {
-                    "parts": [
-                        {"text": prompt}
-                    ]
-                }
-            ]
-        }
-        data = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(
-            url, 
-            data=data, 
-            headers={"Content-Type": "application/json"},
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=15) as response:
-            res_data = json.loads(response.read().decode("utf-8"))
-            return res_data["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception as e:
-        print(f"Direct HTTP urllib call failed: {e}")
+    import urllib.request
+    import json
+    for model_name in models:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+            payload = {
+                "contents": [
+                    {
+                        "parts": [
+                            {"text": prompt}
+                        ]
+                    }
+                ]
+            }
+            data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(
+                url, 
+                data=data, 
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=12) as response:
+                res_data = json.loads(response.read().decode("utf-8"))
+                return res_data["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception as e:
+            print(f"Gemini HTTP urllib model {model_name} call failed: {e}")
 
     # Method 3: Try Google GenAI SDK (google-genai)
     try:
         from google import genai as google_genai
         if google_genai:
-            client = google_genai.Client(api_key=api_key)
-            response = client.models.generate_content(
-                model='gemini-2.0-flash',
-                contents=prompt
-            )
-            return response.text
+            for model_name in models:
+                try:
+                    client = google_genai.Client(api_key=api_key)
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=prompt
+                    )
+                    return response.text
+                except Exception as e:
+                    print(f"Google GenAI SDK model {model_name} failed: {e}")
     except Exception as e:
-        print(f"Google GenAI SDK call failed: {e}")
+        print(f"Google GenAI SDK load failed: {e}")
 
     # Method 4: Try legacy google-generativeai SDK
-    try:
-        import google.generativeai as legacy_genai
-        legacy_genai.configure(api_key=api_key)
-        model = legacy_genai.GenerativeModel('gemini-2.0-flash')
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        print(f"Legacy Google GenerativeAI SDK call failed: {e}")
+    for model_name in models:
+        try:
+            import google.generativeai as legacy_genai
+            legacy_genai.configure(api_key=api_key)
+            model = legacy_genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+            return response.text
+        except Exception as e:
+            print(f"Legacy Google GenerativeAI SDK model {model_name} failed: {e}")
 
-    raise RuntimeError("All Gemini API connection methods failed.")
+    raise RuntimeError("All Gemini API connection methods and models failed.")
 
 @router.post("/chat")
 async def chat_insights(req: ChatRequest, db: Session = Depends(get_db)):

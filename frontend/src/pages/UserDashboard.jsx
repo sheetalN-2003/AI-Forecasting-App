@@ -7,6 +7,7 @@ import {
   Search, ArrowRight, CheckCircle2, AlertTriangle,
   LogOut, Clock, Globe, Wifi, Trash2
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { 
   analyticsAPI, inventoryAPI, forecastingAPI, 
   authAPI, notificationsAPI, insightsAPI
@@ -87,6 +88,7 @@ const LiveSalesGraph = ({ data, loading }) => (
 );
 
 export const UserDashboard = () => {
+  const { user } = useAuth();
   const [metrics, setMetrics] = useState(null);
   const [chartData, setChartData] = useState([]);
   const [inventory, setInventory] = useState([]);
@@ -208,18 +210,42 @@ export const UserDashboard = () => {
   const criticalInventory = inventory.filter(item => item.status === 'CRITICAL_LOW').length;
   const healthyInventory = inventory.filter(item => item.status === 'HEALTHY').length;
 
+  const isVerified = user?.is_verified;
+  const isNewlyRegistered = metrics && (metrics.total_orders === 0 || metrics.total_revenue === 0);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const isDataOld = metrics && metrics.active_date !== todayStr;
+  const revenueTitle = isNewlyRegistered ? "Today's Revenue" : (isDataOld ? "Total Revenue" : "Today's Revenue");
+  const revenueValue = isNewlyRegistered ? 0 : (isDataOld ? metrics.total_revenue : metrics.today_revenue);
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       
       {/* 1. Dashboard Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <KPICard title="Today's Revenue" value={`$${metrics.today_revenue.toLocaleString()}`} icon={DollarSign} colorClass="text-emerald-400" trend={14} />
-        <KPICard title="Total Orders" value={metrics.today_orders} icon={ShoppingBag} colorClass="text-indigo-400" trend={5} />
-        <KPICard title="Predicted Sales" value={`$${metrics.predicted_sales.toLocaleString()}`} icon={TrendingUp} colorClass="text-blue-400" />
-        <KPICard title="Inventory Status" value={metrics.inventory_status} icon={Package} colorClass="text-amber-400" />
-        <KPICard title="Top Product" value={metrics.top_product} icon={Zap} colorClass="text-rose-400" />
-        <KPICard title="Monthly Growth" value={`${metrics.monthly_growth}%`} icon={Activity} colorClass="text-fuchsia-400" />
+        <KPICard title={revenueTitle} value={isNewlyRegistered ? "$0.00" : `$${revenueValue.toLocaleString()}`} icon={DollarSign} colorClass="text-emerald-400" trend={isNewlyRegistered ? null : 14} />
+        <KPICard title="Total Orders" value={isNewlyRegistered ? 0 : metrics.today_orders} icon={ShoppingBag} colorClass="text-indigo-400" trend={isNewlyRegistered ? null : 5} />
+        <KPICard title="Predicted Sales" value={isNewlyRegistered ? "$0.00" : `$${metrics.predicted_sales.toLocaleString()}`} icon={TrendingUp} colorClass="text-blue-400" />
+        <KPICard title="Inventory Status" value={isNewlyRegistered ? "N/A" : metrics.inventory_status} icon={Package} colorClass="text-amber-400" />
+        <KPICard title="Top Product" value={isNewlyRegistered ? "N/A" : metrics.top_product} icon={Zap} colorClass="text-rose-400" />
+        <KPICard title="Monthly Growth" value={isNewlyRegistered ? "0%" : `${metrics.monthly_growth}%`} icon={Activity} colorClass="text-fuchsia-400" />
       </div>
+
+      {isNewlyRegistered && (
+        <div className="p-6 bg-indigo-600/10 border border-indigo-500/20 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
+          <div>
+            <h4 className="text-sm font-black text-white uppercase tracking-tight flex items-center gap-2">
+              <Sparkles className="text-indigo-400 animate-pulse" size={16} /> Awaiting Initialization
+            </h4>
+            <p className="text-xs text-indigo-200 mt-1 font-semibold">Please generate a forecast to initialize analytics!</p>
+          </div>
+          <button 
+            onClick={() => document.getElementById("forecast-panel")?.scrollIntoView({ behavior: 'smooth' })}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-indigo-600/20"
+          >
+            Go to Forecaster
+          </button>
+        </div>
+      )}
 
       {/* 2. Live Sales Graph */}
       <LiveSalesGraph data={chartData} />
@@ -290,7 +316,19 @@ export const UserDashboard = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* 3. AI Sales Forecasting */}
-        <div className="glass p-8">
+        <div id="forecast-panel" className="glass p-8 relative overflow-hidden">
+          {/* Lock Overlay */}
+          {!isVerified && (
+            <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300">
+              <div className="w-16 h-16 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-3xl flex items-center justify-center mb-4">
+                <ShieldCheck size={32} />
+              </div>
+              <h4 className="text-lg font-black text-white uppercase tracking-tight">AI Forecaster Locked</h4>
+              <p className="text-xs text-slate-400 max-w-sm mt-2 leading-relaxed font-semibold">
+                Advanced ML forecasting is locked until Sheetal approves your analyst/user profile.
+              </p>
+            </div>
+          )}
           <div className="flex items-center gap-3 mb-8">
             <div className="p-3 bg-indigo-500/10 rounded-2xl text-indigo-400">
               <Brain size={24} />

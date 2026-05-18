@@ -8,6 +8,7 @@ import {
   Search, ArrowRight, Filter, ChevronRight, FileText, Send,
   LayoutDashboard, BarChart3, Trash2, Clock, Upload
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { 
   analyticsAPI, inventoryAPI, forecastingAPI, 
   insightsAPI, notificationsAPI, dataAPI
@@ -76,17 +77,35 @@ const AnalystCard = ({ title, value, sub, icon: Icon, trend, colorClass }) => (
 // --- Section Components ---
 
 const BusinessOverview = ({ data }) => {
-  const { growth } = data;
+  const { growth, transactions } = data;
+  const isNewlyRegistered = !transactions || transactions.length === 0;
+
+  // Check if calendar today has transactions
+  const todayStr = new Date().toISOString().split('T')[0];
+  const hasTodayTransactions = transactions && transactions.some(tx => tx.order_date && tx.order_date.startsWith(todayStr));
+  const revenueTitle = isNewlyRegistered ? "Current Revenue" : (hasTodayTransactions ? "Current Revenue" : "Total Revenue");
+
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <AnalystCard title="Current Revenue" value={`$${(growth.current_revenue / 1000).toFixed(1)}k`} trend={12.4} icon={DollarSign} colorClass="text-emerald-400" />
-        <AnalystCard title="Predicted Rev." value={`$${(growth.predicted_revenue / 1000).toFixed(1)}k`} trend={8.2} icon={TrendingUp} colorClass="text-indigo-400" />
-        <AnalystCard title="Monthly Growth" value={`${growth.monthly_growth}%`} trend={2.1} icon={Activity} colorClass="text-fuchsia-400" />
-        <AnalystCard title="Inventory Mesh" value={growth.inventory_health} icon={Package} colorClass="text-amber-400" />
-        <AnalystCard title="Alpha Product" value={growth.top_product} icon={ShoppingBag} colorClass="text-blue-400" />
-        <AnalystCard title="AI Fidelity" value={`${growth.forecast_accuracy}%`} icon={Brain} colorClass="text-rose-400" />
+        <AnalystCard title={revenueTitle} value={isNewlyRegistered ? "$0.0k" : `$${(growth.current_revenue / 1000).toFixed(1)}k`} trend={isNewlyRegistered ? null : 12.4} icon={DollarSign} colorClass="text-emerald-400" />
+        <AnalystCard title="Predicted Rev." value={isNewlyRegistered ? "$0.0k" : `$${(growth.predicted_revenue / 1000).toFixed(1)}k`} trend={isNewlyRegistered ? null : 8.2} icon={TrendingUp} colorClass="text-indigo-400" />
+        <AnalystCard title="Monthly Growth" value={isNewlyRegistered ? "0%" : `${growth.monthly_growth}%`} trend={isNewlyRegistered ? null : 2.1} icon={Activity} colorClass="text-fuchsia-400" />
+        <AnalystCard title="Inventory Mesh" value={isNewlyRegistered ? "N/A" : growth.inventory_health} icon={Package} colorClass="text-amber-400" />
+        <AnalystCard title="Alpha Product" value={isNewlyRegistered ? "N/A" : growth.top_product} icon={ShoppingBag} colorClass="text-blue-400" />
+        <AnalystCard title="AI Fidelity" value={isNewlyRegistered ? "0%" : `${growth.forecast_accuracy}%`} icon={Brain} colorClass="text-rose-400" />
       </div>
+
+      {isNewlyRegistered && (
+        <div className="p-6 bg-indigo-600/10 border border-indigo-500/20 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
+          <div>
+            <h4 className="text-sm font-black text-white uppercase tracking-tight flex items-center gap-2">
+              <Sparkles className="text-indigo-400 animate-pulse" size={16} /> Awaiting Initialization
+            </h4>
+            <p className="text-xs text-indigo-200 mt-1 font-semibold">Please generate a forecast to initialize analytics!</p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 glass p-8 relative overflow-hidden group">
@@ -213,7 +232,7 @@ const RealTimeSales = ({ transactions }) => (
   </div>
 );
 
-const ForecastingPanel = () => {
+const ForecastingPanel = ({ isVerified }) => {
   const [form, setForm] = useState({
     region: 'North', category: 'Electronics', quantity: 10, discount: 0.1, month: 5
   });
@@ -233,7 +252,18 @@ const ForecastingPanel = () => {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 relative overflow-hidden rounded-3xl">
+      {!isVerified && (
+        <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300 rounded-3xl">
+          <div className="w-16 h-16 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-3xl flex items-center justify-center mb-4">
+            <ShieldCheck size={32} />
+          </div>
+          <h4 className="text-lg font-black text-white uppercase tracking-tight">AI Forecasting Locked</h4>
+          <p className="text-xs text-slate-400 max-w-sm mt-2 leading-relaxed font-semibold">
+            Advanced ML forecasting is locked until Sheetal approves your analyst/user profile.
+          </p>
+        </div>
+      )}
       <div className="glass p-8">
         <SectionHeader title="AI Forecasting Engine" sub="Predict sales and profit using ensemble ML" icon={Brain} colorClass="text-indigo-400" />
         <div className="space-y-6">
@@ -489,7 +519,7 @@ const ForecastHistoryPanel = ({ history, onDelete }) => (
   </div>
 );
 
-const BulkUploadPanel = () => {
+const BulkUploadPanel = ({ isVerified }) => {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -516,7 +546,18 @@ const BulkUploadPanel = () => {
   };
 
   return (
-    <div className="glass p-8 text-center space-y-6">
+    <div className="glass p-8 text-center space-y-6 relative overflow-hidden rounded-3xl">
+      {!isVerified && (
+        <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300 rounded-3xl">
+          <div className="w-16 h-16 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-3xl flex items-center justify-center mb-4">
+            <ShieldCheck size={32} />
+          </div>
+          <h4 className="text-lg font-black text-white uppercase tracking-tight">Batch Prediction Locked</h4>
+          <p className="text-xs text-slate-400 max-w-sm mt-2 leading-relaxed font-semibold">
+            Batch forecasting operations are locked until Sheetal approves your analyst/user profile.
+          </p>
+        </div>
+      )}
       <SectionHeader title="Batch Forecasting Hub" sub="Upload historical CSV data for mass AI analysis" icon={Upload} colorClass="text-emerald-400" />
       <div className="border-2 border-dashed border-white/10 rounded-3xl p-12 hover:border-indigo-500/50 transition-all group">
         <Upload size={48} className="mx-auto text-slate-600 group-hover:text-indigo-400 mb-4" />
@@ -677,6 +718,7 @@ const AIChatbot = () => {
 // --- Main Dashboard Component ---
 
 export const AnalystDashboard = () => {
+  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -788,8 +830,8 @@ export const AnalystDashboard = () => {
     switch (activeSection) {
       case 'overview':  return <BusinessOverview data={data} onRefresh={fetchData} />;
       case 'realtime':  return <RealTimeSales transactions={data.transactions} onRefresh={fetchData} />;
-      case 'forecast':  return <ForecastingPanel onRefresh={fetchData} />;
-      case 'batch':     return <BulkUploadPanel />;
+      case 'forecast':  return <ForecastingPanel isVerified={user?.is_verified} onRefresh={fetchData} />;
+      case 'batch':     return <BulkUploadPanel isVerified={user?.is_verified} />;
       case 'history':   return <ForecastHistoryPanel history={history} onDelete={handleDeleteHistory} onRefresh={fetchData} />;
       case 'inventory': return <InventoryIntelligence inventory={data.inventory} onRefresh={fetchData} />;
       case 'insights':  return <AIInsights insights={data.insights} onRefresh={fetchData} />;

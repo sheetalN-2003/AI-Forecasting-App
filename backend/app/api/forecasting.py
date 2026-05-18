@@ -108,6 +108,19 @@ async def predict_sales(request: PredictionRequest, db: Session = Depends(get_db
             model_version="Demo-Heuristic"
         )
         db.add(history)
+        
+        # Save to DB Notification
+        try:
+            from app.models.schemas import Notification
+            db.add(Notification(
+                title="Retail Store Forecast" if current_user.role == "User" else "AI Forecast Generated",
+                message=f"Store User '{current_user.username}' created a mock forecast for '{request.category}' (Est: ${avg_pred:,.2f}, Qty: {request.quantity}).",
+                type="info",
+                priority="medium"
+            ))
+        except Exception as e:
+            print(f"Failed to save mock forecast notification: {e}")
+            
         db.commit()
 
         return PredictionResponse(
@@ -153,6 +166,19 @@ async def predict_sales(request: PredictionRequest, db: Session = Depends(get_db
             model_version="Ensemble-v1.0"
         )
         db.add(history)
+        
+        # Save to DB Notification
+        try:
+            from app.models.schemas import Notification
+            db.add(Notification(
+                title="AI Forecast Generated",
+                message=f"Data Analyst '{current_user.username}' completed an ensemble ML prediction for category '{request.category}' (Est: ${avg_pred:,.2f}, Conf: {confidence*100:.0f}%).",
+                type="info",
+                priority="medium"
+            ))
+        except Exception as e:
+            print(f"Failed to save production forecast notification: {e}")
+            
         db.commit()
 
         return PredictionResponse(

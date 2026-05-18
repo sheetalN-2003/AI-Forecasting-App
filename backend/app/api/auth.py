@@ -161,12 +161,15 @@ def _send_via_smtp(to: str, subject: str, body: str):
 
     try:
         server = smtplib.SMTP(host, port, timeout=15)
+        server.ehlo() # Resilient handshake
         server.starttls()
+        server.ehlo() # Resilient handshake post-TLS
         server.login(user, password)
         server.send_message(msg)
         server.quit()
         print(f"Email sent to {to} via SMTP")
     except Exception as e:
+        print(f"⚠️ [SMTP FAIL] {e}")
         raise HTTPException(status_code=500, detail=f"Failed to send email via SMTP: {e}")
 
 
@@ -310,6 +313,21 @@ def notify_admin_of_new_user(new_user, db: Session):
             print(f"⚠️ [SMTP NOTIFY FAIL] Could not email new user registration to {admin_email}: {e}")
             
     threading.Thread(target=send_email, daemon=True).start()
+
+    # 3. Save to database Notifications table so it shows up in Admin's notification center
+    try:
+        from app.models.schemas import Notification
+        admin_alert = Notification(
+            title="NEW USER REGISTRATION",
+            message=f"Pending Clearance: User '{new_user.username}' ({new_user.role}) has completed registration and is awaiting your verification.",
+            type="alert",
+            priority="high",
+            is_read=0
+        )
+        db.add(admin_alert)
+        db.commit()
+    except Exception as e:
+        print(f"Failed to record Admin registration alert in database: {e}")
 
     # 2. Broadcast WebSocket Event to Admin Dashboard in Real-Time
     try:
