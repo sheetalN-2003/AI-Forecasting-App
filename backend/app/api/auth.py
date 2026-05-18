@@ -43,6 +43,8 @@ class UserResponse(BaseModel):
     username: str
     email: str
     role: str
+    is_verified: bool
+    is_active: bool
     department: Optional[str] = None
     organization: Optional[str] = None
 
